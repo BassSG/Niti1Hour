@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
 function paymentContext() {
-  const source = readFileSync(new URL('./Code.gs', import.meta.url), 'utf8');
+  const source = readFileSync(new URL('../gas/src/Code.gs', import.meta.url), 'utf8');
   const context = vm.createContext({});
   vm.runInContext(source, context);
   const order = {
