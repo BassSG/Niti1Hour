@@ -6,7 +6,17 @@
   "description": "ระบบรับฝากซัก-อบ-พับ แยกจากระบบรีดผ้าเดิมของนิติ รีดเรียบ",
   "scripts": {
     "test": "node --test",
-    "check": "node --check worker/index.js && node --check packages/shared/business.js && node --check worker/index.test.js && node --test"
+    "check": "node --check worker/index.js && node --check packages/shared/business.js && node --check worker/index.test.js && node --test",
+    "build:qr": "esbuild node_modules/qrcode/lib/browser.js --bundle --minify --format=iife --global-name=QRCode --outfile=apps/vendor/qrcode.min.js"
   },
-  "engines": { "node": ">=20" }
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "promptpay-qr": "0.5.0",
+    "qrcode": "1.5.4"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
 }

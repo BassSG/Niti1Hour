@@ -48,7 +48,7 @@
     <section class="essentials" aria-label="เงื่อนไขเบื้องต้น">
       <div class="essential"><span class="symbol">✳</span><b>แยกผ้าสีด้วยตนเอง</b><small>ตรวจป้ายดูแลผ้าก่อนส่งร้าน</small></div>
       <div class="essential"><span class="symbol">◌</span><b>นำน้ำยามาเอง</b><small>ราคาปกติไม่รวมผลิตภัณฑ์ซักผ้า</small></div>
-      <div class="essential"><span class="symbol">฿</span><b>ชำระก่อนเริ่มงาน</b><small>ร้านยืนยันยอดหลังตรวจผ้าจริง</small></div>
+      <div class="essential"><span class="symbol">฿</span><b>ชำระตามยอดประเมิน</b><small>ร้านจะแจ้งหากตรวจผ้าแล้วต้องปรับยอด</small></div>
       <div class="essential"><span class="symbol">◷</span><b>เครื่องราว 30 นาที/ขั้น</b><small>เวลาเสร็จจริงขึ้นอยู่กับคิวและการพับ</small></div>
     </section>
 
@@ -60,11 +60,11 @@
           <div class="field"><label for="washer">เครื่องซัก</label><select id="washer" aria-label="ขนาดเครื่องซัก"></select></div>
           <div class="field"><label for="dryer">เครื่องอบ</label><select id="dryer" aria-label="ขนาดเครื่องอบ"></select></div>
         </div>
-        <p class="helper">เลือกขนาดที่ต้องการก่อน ร้านจะตรวจผ้าจริงและยืนยันขนาดอีกครั้ง</p>
+        <p class="helper">เลือกขนาดเครื่องที่ต้องการ ยอดที่แสดงเป็นยอดประเมิน ร้านจะตรวจผ้าจริงก่อนเริ่มงาน</p>
         <h3>ผลิตภัณฑ์ซักผ้า</h3>
         <div class="choice-list">
           <label class="choice"><input type="radio" name="supply" value="customer_own" checked><span><b>นำมาเอง</b><small>นำน้ำยาซักผ้าและน้ำยาปรับผ้านุ่มมาพร้อมผ้า</small></span></label>
-          <label class="choice"><input type="radio" name="supply" value="shop_purchase_requested"><span><b>ขอให้ร้านช่วยซื้อ</b><small>ร้านจะแจ้งราคาเพิ่มให้ยืนยันก่อนสรุปยอดชำระ</small></span></label>
+          <label class="choice"><input type="radio" name="supply" value="shop_purchase_requested"><span><b>ขอให้ร้านจัดหา</b><small>ค่าน้ำยาและน้ำยาปรับผ้านุ่มโอนเพิ่มตามยอดที่ร้านแจ้ง</small></span></label>
         </div>
       </section>
 
@@ -72,13 +72,13 @@
         <div class="step-label">02 / สรุปราคา</div>
         <h2 id="quoteTitle">ยอดประเมินเบื้องต้น</h2>
         <div id="estimate" class="bill" aria-live="polite"></div>
-        <p class="helper">ยอดนี้คำนวณจากขนาดเครื่องที่เลือก ร้านจะตรวจผ้าจริงและยืนยันยอดสุดท้ายก่อนให้ชำระ</p>
+        <p class="helper">เมื่อส่งคำขอ ระบบจะแสดง QR ตามยอดประเมินนี้ทันที หากร้านตรวจแล้วต้องปรับขนาดหรือยอด จะแจ้งให้ทราบก่อนเริ่มงาน</p>
       </section>
 
       <section class="surface form-card send-card" aria-labelledby="sendTitle">
         <div class="step-label">03 / ส่งคำขอ</div>
         <h2 id="sendTitle">ให้ร้านตรวจรายการ</h2>
-        <label class="terms"><input id="confirmTerms" type="checkbox"><span>รับทราบว่าต้องแยกผ้าสีเอง และการอบอาจไม่แห้งสนิทตามชนิดหรือปริมาณผ้า ร้านจะแจ้งเมื่อทำเสร็จจริง</span></label>
+        <label class="terms"><input id="confirmTerms" type="checkbox"><span>รับทราบว่ายอดก่อนส่งคำขอเป็นยอดประเมินจากขนาดเครื่องที่เลือก และร้านอาจแจ้งปรับยอดหลังตรวจผ้าก่อนเริ่มงาน; ต้องแยกผ้าสีเอง และการอบอาจไม่แห้งสนิทตามชนิดหรือปริมาณผ้า</span></label>
         <button class="primary-button" id="submitOrder" type="button" disabled style="margin-top:14px">ส่งคำขอให้ร้านตรวจผ้า</button>
         <p id="status" class="status" role="status" aria-live="polite">กำลังโหลดรายการบริการ…</p>
       </section>
@@ -90,6 +90,7 @@
     </section>
     <footer class="site-footer">นิติ รีดเรียบ · บริการซัก–อบ–พับ สาขา 2<br><a href="/">กลับหน้าหลัก</a></footer>
   </main>
+  <script src="/vendor/qrcode.min.js" defer></script>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js" defer></script>
   <script>
   (() => {
@@ -131,6 +132,71 @@
       try { const saved = JSON.parse(localStorage.getItem(storeKey) || '[]'); return Array.isArray(saved) ? saved : []; }
       catch { return []; }
     }
+    async function paymentImage(payload, orderId, amount, demo) {
+      if (!window.QRCode || typeof window.QRCode.toDataURL !== 'function') throw Error('เครื่องมือสร้าง QR โหลดไม่สำเร็จ กรุณาโหลดหน้าใหม่');
+      const qrDataUrl = await window.QRCode.toDataURL(payload, {
+        errorCorrectionLevel: 'M', margin: 4, width: 360,
+        color: { dark: '#172c38', light: '#ffffff' }
+      });
+      const qr = new Image();
+      qr.src = qrDataUrl;
+      await new Promise((resolve, reject) => { qr.onload = resolve; qr.onerror = () => reject(Error('สร้างภาพ QR ไม่สำเร็จ')); });
+      const canvas = document.createElement('canvas');
+      canvas.width = 420; canvas.height = demo ? 600 : 565;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(qr, 30, 24, 360, 360);
+      ctx.textAlign = 'center'; ctx.fillStyle = '#172c38';
+      ctx.font = '700 18px "Segoe UI", "Leelawadee UI", sans-serif';
+      ctx.fillText('นิติ รีดเรียบ · ซัก–อบ–พับ', 210, 420);
+      ctx.font = '14px "Segoe UI", "Leelawadee UI", sans-serif'; ctx.fillStyle = '#65737a';
+      ctx.fillText(orderId, 210, 448);
+      ctx.font = '700 26px "Segoe UI", "Leelawadee UI", sans-serif'; ctx.fillStyle = '#ae684a';
+      ctx.fillText('ยอด ' + new Intl.NumberFormat('th-TH').format(amount) + ' บาท', 210, 490);
+      ctx.font = '700 16px "Segoe UI", "Leelawadee UI", sans-serif'; ctx.fillStyle = '#172c38';
+      ctx.fillText('บัญชี นนท์ พฤกษาพงษ์', 210, 520);
+      if (demo) {
+        ctx.fillStyle = '#fff0e9'; ctx.fillRect(0, 540, canvas.width, 60);
+        ctx.fillStyle = '#a5463a'; ctx.font = '700 16px "Segoe UI", "Leelawadee UI", sans-serif';
+        ctx.fillText('DEMO · QR นี้ใช้ชำระเงินจริงไม่ได้', 210, 577);
+      } else {
+        ctx.fillStyle = '#65737a'; ctx.font = '12px "Segoe UI", "Leelawadee UI", sans-serif';
+        ctx.fillText('ตรวจชื่อผู้รับและยอดในแอปธนาคารก่อนโอน', 210, 548);
+      }
+      return canvas.toDataURL('image/png');
+    }
+    async function populatePaymentQr(panel) {
+      const imageBox = panel.querySelector('.payment-qr-wrap');
+      const download = panel.querySelector('[data-download-qr]');
+      const orderId = panel.dataset.qrOrder;
+      const amount = Number(panel.dataset.qrAmount);
+      const demo = isDemo;
+      try {
+        let payload;
+        if (demo) {
+          payload = 'DEMO ONLY - NOT A PAYMENT - ' + orderId + ' - ' + amount;
+        } else {
+          const response = await fetch('/api/orders/' + encodeURIComponent(orderId) + '/payment-qr', {
+            headers: { authorization: 'Bearer ' + idToken }
+          });
+          const result = await response.json();
+          if (!response.ok || !result.ok) throw Error(result.error?.message || 'ยังสร้าง QR รับเงินไม่ได้');
+          if (Number(result.data.amountBaht) !== amount) throw Error('ยอด QR เปลี่ยนระหว่างโหลด กรุณารีเฟรชรายการก่อนชำระ');
+          payload = result.data.qrPayload;
+        }
+        const imageUrl = await paymentImage(payload, orderId, amount, demo);
+        const image = document.createElement('img');
+        image.className = 'payment-qr-image';
+        image.alt = demo ? 'QR ตัวอย่างที่ใช้ชำระเงินจริงไม่ได้' : 'PromptPay QR ยอด ' + amount + ' บาท';
+        image.src = imageUrl;
+        imageBox.replaceChildren(image);
+        download.href = imageUrl;
+        download.download = 'niti-payment-' + orderId + '.png';
+        download.hidden = false;
+      } catch (error) {
+        imageBox.innerHTML = '<div class="payment-qr-error">' + esc(error.message || 'โหลด QR ไม่สำเร็จ') + '</div>';
+      }
+    }
     function quoteNow() {
       const w = catalog && catalog.washers[washer.value];
       const d = catalog && catalog.dryers[dryer.value];
@@ -141,9 +207,9 @@
       estimate.innerHTML = row('ซักถัง ' + washer.value + ' กก.', baht(w.machineBaht))
         + row('อบถัง ' + dryer.value + ' กก.', baht(d.machineBaht))
         + row('ค่าบริการร้าน', baht(fee))
-        + (manual ? row('ค่าผลิตภัณฑ์', 'รอร้านแจ้ง') : '')
-        + '<div class="billrow total"><span>' + (manual ? 'ยอดสุดท้าย' : 'ยอดประเมิน') + '</span><b>'
-        + (manual ? 'รอสรุป' : baht(w.machineBaht + d.machineBaht + fee)) + '</b></div>';
+        + (manual ? row('ค่าน้ำยาและปรับผ้านุ่ม', 'โอนเพิ่มตามร้านแจ้ง') : '')
+        + '<div class="billrow total"><span>ยอดประเมินที่ชำระก่อน</span><b>'
+        + baht(w.machineBaht + d.machineBaht + fee) + '</b></div>';
     }
     function renderOrders(orders) {
       const section = document.querySelector('#myOrders');
@@ -153,6 +219,11 @@
         const id = esc(o.orderId);
         const state = String(o.state || 'awaiting_dropoff');
         const total = o.quoteTotalBaht == null ? null : Number(o.quoteTotalBaht);
+        const canPayNow = ['awaiting_dropoff', 'awaiting_quote', 'awaiting_payment'].includes(state)
+          && (isDemo || ['unpaid','partial'].includes(o.paymentState))
+          && Number.isFinite(Number(o.paymentAmountBaht)) && Number(o.paymentAmountBaht) > 0;
+        const amountToPay = canPayNow ? Number(o.paymentAmountBaht) : null;
+        const quoteKind = o.quoteKind === 'confirmed' ? 'confirmed' : 'estimate';
         let extra = '';
         if (state === 'awaiting_customer_quote_acceptance') {
           extra = '<div class="callout">ร้านเสนอค่าผลิตภัณฑ์เพิ่ม ' + baht(o.supplyBaht)
@@ -161,19 +232,31 @@
             + '<button class="secondary-button" data-order="' + id + '" data-action="decline">ไม่รับข้อเสนอ</button></div>';
         } else if (state === 'awaiting_payment') {
           extra = '<div class="callout">ยอดที่ร้านยืนยัน <b>' + (total == null ? 'รอร้านสรุป' : baht(total))
-            + '</b><br>กรุณารับรายละเอียดการชำระจากร้าน แล้วส่งสลิปในแชต LINE OA ให้ร้านตรวจ</div>';
+            + '</b><br>เมื่อโอนแล้ว ส่งสลิปในแชต LINE OA ให้ร้านตรวจยอดเงินจริง</div>';
         } else if (state === 'payment_review') {
           extra = '<div class="callout">ร้านได้รับแจ้งยอดแล้ว กำลังตรวจเงินจริง</div>';
         } else if (state === 'ready') {
           extra = '<div class="callout">ร้านบันทึกว่าผ้าพร้อมรับแล้ว</div>';
         }
+        if (o.paymentState === 'review' && state !== 'payment_review') extra += '<div class="callout">ร้านกำลังตรวจยอดโอนที่แจ้งในแชต</div>';
+        if (o.paymentState === 'overpaid') extra += '<div class="callout">ยอดที่รับแล้วเกินบิลล่าสุด กรุณาติดต่อร้านเพื่อจัดการส่วนต่างก่อนเริ่มงาน</div>';
+        const paymentPanel = canPayNow ? '<section class="payment-panel" data-qr-order="' + id + '" data-qr-amount="' + amountToPay + '">'
+          + '<div class="payment-panel-head"><div><span class="overline">' + (quoteKind === 'confirmed' ? 'ยอดยืนยันแล้ว' : 'ยอดประเมิน') + '</span>'
+          + '<h3>สแกน QR เพื่อชำระ</h3></div><strong>' + baht(amountToPay) + '</strong></div>'
+          + '<p class="payment-recipient">ชื่อบัญชี: <strong>นนท์ พฤกษาพงษ์</strong></p>'
+          + '<div class="payment-qr-wrap"><div class="payment-qr-loading">กำลังเตรียม QR…</div></div>'
+          + '<a class="secondary-button payment-download" data-download-qr hidden>ดาวน์โหลด QR พร้อมยอด</a>'
+          + '<div class="payment-supply">' + (o.supplyMode === 'shop_purchase_requested' ? 'ขอให้ร้านจัดหาน้ำยา/ปรับผ้านุ่ม: โอนค่าส่วนนี้เพิ่มตามยอดที่ร้านแจ้ง' : 'น้ำยาซักผ้าและน้ำยาปรับผ้านุ่ม: กรุณานำมาเอง') + '</div>'
+          + '<p class="payment-note">' + (quoteKind === 'confirmed' ? 'ร้านตรวจรายการและยืนยันยอดแล้ว' : 'ยอดนี้คำนวณจากขนาดเครื่องที่เลือก ร้านจะตรวจผ้าจริงก่อนเริ่มงาน หากต้องเปลี่ยนขนาดหรือยอด กรุณารอร้านแจ้งวิธีจัดการส่วนต่างก่อนเริ่มงาน')
+          + '<br>หลังโอน กรุณาส่งสลิปในแชต LINE OA ให้ร้านตรวจ ยอดจะยังไม่ถือว่ารับชำระจนกว่าแอดมินตรวจบัญชีแล้ว</p></section>' : '';
         return '<article class="order-card"><div class="order-title"><strong>' + id + '</strong><span class="state-chip">'
           + esc(stateNames[state] || 'ร้านกำลังอัปเดต') + '</span></div>'
           + '<p>ซัก ' + Number(o.washerKg || 0) + ' กก. · อบ ' + Number(o.dryerKg || 0) + ' กก.</p>'
           + '<p>' + (state === 'awaiting_dropoff' || state === 'awaiting_quote' ? 'ยอดประเมิน' : 'ยอดตามรายการ')
-          + ': <b>' + (total == null ? 'รอร้านสรุป' : baht(total)) + '</b></p>' + extra
+          + ': <b>' + (total == null ? (amountToPay == null ? 'รอร้านสรุป' : baht(amountToPay)) : baht(total)) + '</b></p>' + extra + paymentPanel
           + (isDemo ? '<p>ข้อมูลจำลอง · ไม่ได้ส่งเข้าร้าน</p>' : '') + '</article>';
       }).join('');
+      list.querySelectorAll('.payment-panel').forEach(panel => { void populatePaymentQr(panel); });
     }
     async function fetchOrders() {
       if (!liffReady) return;
@@ -192,7 +275,7 @@
       quoteNow();
       if (isDemo) {
         document.querySelector('#modeBadge').hidden = false;
-        renderOrders(demoOrders().map(o => ({ ...o, state: 'awaiting_dropoff', quoteTotalBaht: o.estimateBaht })));
+        renderOrders(demoOrders().map(o => ({ ...o, state: 'awaiting_dropoff', quoteTotalBaht: o.estimateBaht, paymentAmountBaht: o.estimateBaht, paymentState: 'unpaid', quoteKind: 'estimate' })));
         message('โหมดทดลอง · สร้างรายการจำลองได้ในเครื่องนี้');
       } else if (config.liffId && window.liff) {
         await liff.init({ liffId: config.liffId });
@@ -221,10 +304,11 @@
           orders.unshift({
             orderId: 'DEMO-' + String(Date.now()).slice(-8),
             washerKg: Number(washer.value), dryerKg: Number(dryer.value),
-            estimateBaht: w.machineBaht + d.machineBaht + fee
+            estimateBaht: w.machineBaht + d.machineBaht + fee,
+            supplyMode: document.querySelector('[name="supply"]:checked').value
           });
           localStorage.setItem(storeKey, JSON.stringify(orders.slice(0, 10)));
-          renderOrders(orders.map(o => ({ ...o, state: 'awaiting_dropoff', quoteTotalBaht: o.estimateBaht })));
+          renderOrders(orders.map(o => ({ ...o, state: 'awaiting_dropoff', quoteTotalBaht: o.estimateBaht, paymentAmountBaht: o.estimateBaht, paymentState: 'unpaid', quoteKind: 'estimate' })));
           message('สร้างรายการจำลองแล้ว · ไม่ได้บันทึกในชีตหรือส่ง LINE', 'ok');
           document.querySelector('#myOrders').scrollIntoView({ behavior: 'smooth', block: 'start' });
           return;
@@ -242,8 +326,9 @@
         });
         const result = await response.json();
         if (!response.ok || !result.ok) throw Error(result.error?.message || 'ส่งคำขอไม่สำเร็จ');
-        message('ส่งคำขอแล้ว เลขงาน ' + result.data.orderId + ' · รอร้านตรวจผ้า', 'ok');
+        message('ส่งคำขอแล้ว เลขงาน ' + result.data.orderId + ' · แสดง QR ตามยอดประเมิน', 'ok');
         await fetchOrders();
+        document.querySelector('#myOrders').scrollIntoView({ behavior: 'smooth', block: 'start' });
       } catch (error) {
         message(error.message || 'ส่งคำขอไม่สำเร็จ กรุณาลองใหม่', 'error');
       } finally { submit.disabled = false; }

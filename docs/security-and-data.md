@@ -5,6 +5,9 @@
 - LINE identity is taken from the server-verified ID token payload (`iss`, `sub`, `aud`, `exp`), never from a user ID supplied by the browser. Admin writes require a verified ID on an allowlist.
 - Owner chose to retain Anyone-with-link viewer access on the supplied Drive folders. The web/API/Apps Script slip upload and retrieval actions are disabled. Customers send slips to the existing LINE OA chat; admins compare the chat report, bill, and actual bank receipt before confirming payment.
 - Log only request ID, action, status, and error code; do not log tokens, image contents, full LINE payloads, or bank credentials.
+- The shop PromptPay recipient must be stored only as the Cloudflare Worker secret `PROMPTPAY_ID`. Never expose it through `NITI_CONFIG`, HTML, the source repository, or logs. The customer QR endpoint verifies the LINE customer and retrieves the amount from that customer's server-side order before producing the amount-prefilled payload.
+- Admin alerts use one `ADMIN_NOTIFY_USER_ID` secret, separate from the admin login allowlist. The LINE channel token is a Worker secret; rotate any token previously pasted into chat before enabling sends. Flex pushes use a stable LINE retry key, while Apps Script records queued/sent events to retry failed new-order notices.
+- In DEMO mode, the customer page creates a clearly watermarked, non-payment sample QR locally. DEMO never returns a real PromptPay payload or accepts order writes.
 - The demo API rejects all writes. No live credentials or Script Properties have been configured in source.
 - Apps Script manifest asks only for spreadsheet access. The owner must review and approve Google authorization before running setup.
 

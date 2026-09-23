@@ -168,6 +168,20 @@ a { color: inherit; }
 .state-chip { display: inline-flex; align-items: center; border-radius: 999px; padding: 5px 9px; background: #edf2ef; color: #3c625d; font-size: 11px; font-weight: 750; }
 .callout { padding: 13px 15px; background: var(--gold-wash); border: 1px solid var(--gold-light); border-radius: 12px; font-size: 13px; line-height: 1.6; margin: 12px 0; }
 .callout b { color: var(--ink); }
+.payment-panel { margin-top: 14px; padding: 18px; border: 1px solid #d8e3de; border-radius: 16px; background: linear-gradient(145deg, #f7fbf8, #fffefa); text-align: center; }
+.payment-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; text-align: left; }
+.payment-panel-head .overline { display: block; color: var(--good); font-size: 10px; font-weight: 850; letter-spacing: .13em; }
+.payment-panel-head h3 { margin: 4px 0 0; color: var(--ink); font-size: 18px; }
+.payment-panel-head > strong { color: var(--copper); font-size: clamp(20px, 4vw, 28px); white-space: nowrap; }
+.payment-qr-wrap { width: min(100%, 380px); min-height: 280px; margin: 14px auto 8px; display: grid; place-items: center; overflow: hidden; border: 1px solid var(--line); border-radius: 13px; background: #fff; }
+.payment-qr-loading, .payment-qr-error { padding: 25px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.payment-qr-error { color: var(--bad); }
+.payment-qr-image { display: block; width: min(100%, 360px); height: auto; }
+.payment-recipient { margin: 10px 0 0; color: #52616a; font-size: 14px; }
+.payment-recipient strong { color: #172c38; }
+.payment-supply { margin: 14px auto 0; padding: 12px 14px; max-width: 600px; border: 1px solid #e8d7c5; border-radius: 11px; background: #fff9f0; color: #754c32; font-size: 14px; font-weight: 700; line-height: 1.5; }
+.payment-download { display: inline-flex; align-items: center; justify-content: center; margin: 5px auto 0; text-decoration: none; }
+.payment-note { max-width: 560px; margin: 12px auto 0 !important; color: var(--muted); font-size: 12px !important; line-height: 1.7 !important; text-align: left; }
 .site-footer { color: var(--muted); font-size: 12px; text-align: center; margin: 30px 0 0; line-height: 1.7; }
 .site-footer a { color: var(--ink); text-underline-offset: 3px; }
 

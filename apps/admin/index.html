@@ -189,9 +189,9 @@
     }
     function actionsFor(o) {
       switch (o.state) {
-        case 'awaiting_dropoff': return [['ยืนยันรับผ้า', 'dropoff']];
-        case 'awaiting_quote': return [['ตรวจและยืนยันยอด', 'quote']];
-        case 'awaiting_payment': return [['ลูกค้าแจ้งโอนในแชต', 'report-payment-from-chat']];
+        case 'awaiting_dropoff': return [['ยืนยันรับผ้า', 'dropoff'], [o.paymentState === 'review' ? 'ยืนยันรับเงินจริง' : 'ลูกค้าแจ้งโอนในแชต', o.paymentState === 'review' ? 'verify-payment' : 'report-payment-from-chat']];
+        case 'awaiting_quote': return o.paymentState === 'review' ? [['ยืนยันรับเงินจริง', 'verify-payment']] : [['ตรวจและยืนยันยอด', 'quote'], ['ลูกค้าแจ้งโอนในแชต', 'report-payment-from-chat']];
+        case 'awaiting_payment': return o.paymentState === 'overpaid' ? [] : [['ลูกค้าแจ้งโอนในแชต', 'report-payment-from-chat']];
         case 'payment_review': return [['ยืนยันรับเงินจริง', 'verify-payment']];
         case 'paid': return [['เริ่มซัก', 'start-wash']];
         case 'washing': return [['ซักเสร็จ → เลือกเครื่องอบ', 'complete-wash']];
@@ -208,7 +208,7 @@
       const metrics = [
         ['รอตรวจผ้า', count(['awaiting_dropoff','awaiting_quote'])],
         ['รอลูกค้า / ชำระ', count(['awaiting_customer_quote_acceptance','awaiting_payment'])],
-        ['รอตรวจเงิน', count(['payment_review'])],
+        ['รอตรวจเงิน', all.filter(o => o.paymentState === 'review').length],
         ['คิวเครื่องซัก–อบ', count(['paid','washing','drying_pending','drying'])],
         ['พร้อมรับ', count(['ready'])]
       ];
@@ -217,12 +217,13 @@
         + item[0] + '</small><b>' + item[1] + '</b></div>'
       ).join('');
 
-      const due = all.filter(o => ['washing','drying'].includes(o.state) && o.dueAt && Date.parse(o.dueAt) <= Date.now());
+      const due = all.filter(o => ['washing','drying'].includes(o.state) && o.dueAt && Date.parse(o.dueAt) <= Date.now() + 5 * 60000);
       document.querySelector('#duePanel').hidden = due.length === 0;
-      document.querySelector('#dueList').innerHTML = due.map(o =>
-        '<div class="due-item">งาน <b>' + esc(o.orderId) + '</b> · เครื่อง ' + esc(o.machineNo || 'ยังไม่กำหนด')
-        + ' · ขั้นตอน' + (o.state === 'washing' ? 'ซัก' : 'อบ') + 'ครบเวลาแล้ว กรุณาตรวจเครื่องก่อนกดขั้นตอนถัดไป</div>'
-      ).join('');
+      document.querySelector('#dueList').innerHTML = due.map(o => {
+        const remaining = Math.max(0, Math.ceil((Date.parse(o.dueAt) - Date.now()) / 60000));
+        return '<div class="due-item">งาน <b>' + esc(o.orderId) + '</b> · เครื่อง' + (o.state === 'washing' ? 'ซัก' : 'อบ') + 'เลข <b>' + esc(o.machineNo || 'ยังไม่กำหนด')
+          + '</b> · ' + (remaining ? 'เหลือประมาณ ' + remaining + ' นาที' : 'ครบเวลาโดยประมาณแล้ว') + ' · กรุณาตรวจเครื่องจริงก่อนกดขั้นตอนถัดไป</div>';
+      }).join('');
 
       const search = document.querySelector('#search').value.trim().toLowerCase();
       const filter = document.querySelector('#filter').value;
@@ -243,10 +244,10 @@
           ).join('');
           const dueText = o.dueAt ? new Date(o.dueAt).toLocaleString('th-TH', { dateStyle:'short', timeStyle:'short' }) : '';
           const amount = o.estimateBaht == null ? 'รอยืนยันราคา' : money(o.estimateBaht);
-          const payment = o.paymentState === 'verified' ? 'ยืนยันแล้ว' : o.paymentState === 'review' ? 'รอตรวจ' : 'ยังไม่ชำระ';
-          const review = o.state === 'payment_review'
+          const payment = o.paymentState === 'verified' ? 'ยืนยันแล้ว' : o.paymentState === 'review' ? 'รอตรวจ' : o.paymentState === 'partial' ? 'ชำระบางส่วน' : o.paymentState === 'overpaid' ? 'ยอดเกิน · ตรวจส่วนต่าง' : 'ยังไม่ชำระ';
+          const review = o.paymentState === 'review'
             ? '<div class="job-note">ลูกค้าแจ้ง ' + (o.reportedAmountBaht == null ? '—' : money(o.reportedAmountBaht))
-              + ' · ยอดตามบิล ' + (o.expectedAmountBaht == null ? '—' : money(o.expectedAmountBaht))
+              + ' · ยอดรายการนี้ ' + (o.expectedAmountBaht == null ? '—' : money(o.expectedAmountBaht))
               + '<br>ตรวจสลิปในแชต LINE OA และตรวจยอดเงินจริงในบัญชีก่อนยืนยัน</div>'
             : '';
           return '<article class="job"><div class="job-head"><strong>' + esc(o.orderId)
@@ -255,7 +256,7 @@
             + '<div class="job-meta">ซัก ' + Number(o.washerKg || 0) + ' กก. · อบ ' + Number(o.dryerKg || 0)
             + ' กก. · ' + (o.supplyMode === 'customer_own' ? 'ลูกค้านำผลิตภัณฑ์มาเอง' : 'รอเสนอราคาผลิตภัณฑ์') + '</div>'
             + '<div class="job-row"><span class="state-chip">' + esc(stateNames[o.state] || 'กำลังดำเนินการ')
-            + '</span><span>ชำระ: ' + payment + '</span></div>'
+            + '</span><span>ชำระ: ' + payment + (o.outstandingBaht > 0 ? ' · ค้าง ' + money(o.outstandingBaht) : '') + '</span></div>'
             + activeMachineLine(o) + machinePick
             + review + (dueText ? '<div class="job-note">ครบเวลาโดยประมาณ ' + esc(dueText) + ' · ไม่ใช่เวลารับประกัน</div>' : '')
             + '<div class="job-actions">' + actionButtons + '</div></article>';
@@ -291,11 +292,12 @@
         if (slug === 'dropoff') order.state = 'awaiting_quote';
         else if (slug === 'quote') order.state = order.supplyMode === 'shop_purchase_requested' ? 'awaiting_customer_quote_acceptance' : 'awaiting_payment';
         else if (slug === 'report-payment-from-chat') {
-          order.state = 'payment_review'; order.paymentState = 'review';
+          if (order.state === 'awaiting_payment') order.state = 'payment_review';
+          order.paymentState = 'review';
           order.reportedAmountBaht = Number(order.estimateBaht);
           order.expectedAmountBaht = Number(order.estimateBaht);
         }
-        else if (slug === 'verify-payment') { order.state = 'paid'; order.paymentState = 'verified'; }
+        else if (slug === 'verify-payment') { if (order.state === 'payment_review') order.state = 'paid'; order.paymentState = order.state === 'paid' ? 'verified' : 'partial'; }
         else if (slug === 'start-wash') {
           order.state = 'washing'; order.machineId = selectedMachine.machineId; order.machineNo = selectedMachine.displayNo;
           order.dueAt = new Date(Date.now() + 1800000).toISOString();
@@ -325,7 +327,7 @@
         body = { washerKg: order.washerKg, dryerKg: order.dryerKg };
       }
       if (slug === 'report-payment-from-chat') {
-        const raw = prompt('ยอดที่ลูกค้าแจ้งโอนในแชต LINE OA (บาท)', String(order.estimateBaht ?? ''));
+        const raw = prompt('ยอดที่ลูกค้าแจ้งโอนในแชต LINE OA (บาท)', String(order.outstandingBaht ?? order.estimateBaht ?? ''));
         if (raw === null) return;
         const amount = Number(raw);
         if (!Number.isFinite(amount) || amount <= 0) throw Error('กรุณากรอกยอดที่ลูกค้าแจ้ง');
