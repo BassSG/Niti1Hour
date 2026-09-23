@@ -164,11 +164,11 @@ async function fetchHandler(request, env, ctx) {
   if (url.pathname === '/api' || url.pathname.startsWith('/api/')) return handleApi(request, env);
   if (request.method !== 'GET' && request.method !== 'HEAD') return safeError('METHOD_NOT_ALLOWED', 'ไม่รองรับคำสั่งนี้', 405);
   if (url.pathname === '/') return Response.redirect(new URL('/customer/', url), 302);
-  if (url.pathname === '/customer' || url.pathname === '/customer/') url.pathname = '/customer/index.html';
-  if (url.pathname === '/admin' || url.pathname === '/admin/') url.pathname = '/admin/index.html';
+  if (url.pathname === '/customer' || url.pathname === '/customer/index.html') url.pathname = '/customer/';
+  if (url.pathname === '/admin' || url.pathname === '/admin/index.html') url.pathname = '/admin/';
   const asset = await env.ASSETS.fetch(new Request(url, request));
   if (asset.status === 404) return safeError('PAGE_NOT_FOUND', 'ไม่พบหน้าที่ต้องการ', 404);
-  if (/^\/(customer|admin)\/index\.html$/.test(url.pathname)) return applyPublicConfig(asset, env);
+  if (/^\/(customer|admin)\/$/.test(url.pathname)) return applyPublicConfig(asset, env);
   return asset;
 }
 
