@@ -98,14 +98,32 @@
       return [
         { orderId:'DEMO-01', displayName:'ลูกค้าทดสอบ A', state:'awaiting_dropoff', washerKg:9, dryerKg:14, estimateBaht:110, supplyMode:'customer_own', paymentState:'unpaid' },
         { orderId:'DEMO-02', displayName:'ลูกค้าทดสอบ B', state:'payment_review', washerKg:14, dryerKg:21, estimateBaht:150, expectedAmountBaht:150, reportedAmountBaht:150, supplyMode:'customer_own', paymentState:'review' },
-        { orderId:'DEMO-03', displayName:'ลูกค้าทดสอบ C', state:'washing', washerKg:18, dryerKg:21, estimateBaht:170, supplyMode:'customer_own', paymentState:'verified', machineId:'W-TEST-18', machineNo:'W-TEST-1', dueAt:new Date(Date.now()-60000).toISOString() },
+        { orderId:'DEMO-03', displayName:'ลูกค้าทดสอบ C', state:'washing', washerKg:18, dryerKg:21, estimateBaht:170, supplyMode:'customer_own', paymentState:'verified', machineId:'W-5', machineNo:'5', dueAt:new Date(Date.now()-60000).toISOString() },
         { orderId:'DEMO-04', displayName:'ลูกค้าทดสอบ D', state:'folding', washerKg:27, dryerKg:25, estimateBaht:220, supplyMode:'customer_own', paymentState:'verified' }
       ];
     }
     function demoOrders() {
       try {
         const saved = JSON.parse(localStorage.getItem(storeKey) || 'null');
-        if (Array.isArray(saved)) return saved;
+        if (Array.isArray(saved)) {
+          const legacyIds = {
+            'W-TEST-9': ['W-1','1'], 'W-TEST-14': ['W-3','3'], 'W-TEST-18': ['W-5','5'], 'W-TEST-27': ['W-6','6'],
+            'D-TEST-14': ['D-7','7'], 'D-TEST-21': ['D-9','9'], 'D-TEST-25': ['D-11','11']
+          };
+          let changed = false;
+          const migrated = saved.map(order => {
+            let legacy = legacyIds[order.machineId];
+            if (!legacy && order.state === 'washing' && order.machineNo === 'W-TEST-1') legacy = ['W-5','5'];
+            if (!legacy && order.state === 'drying' && order.machineNo === 'D-TEST-1') {
+              legacy = Number(order.dryerKg) === 14 ? ['D-7','7'] : Number(order.dryerKg) === 25 ? ['D-11','11'] : ['D-9','9'];
+            }
+            if (!legacy) return order;
+            changed = true;
+            return { ...order, machineId:legacy[0], machineNo:legacy[1] };
+          });
+          if (changed) localStorage.setItem(storeKey, JSON.stringify(migrated));
+          return migrated;
+        }
       } catch {}
       const initial = seed();
       localStorage.setItem(storeKey, JSON.stringify(initial));
@@ -115,13 +133,21 @@
     function machineRoster() {
       if (!isDemo) return liveMachines;
       const definitions = [
-        { machineId:'W-TEST-9', type:'wash', capacityKg:9, displayNo:'W-TEST-9' },
-        { machineId:'W-TEST-14', type:'wash', capacityKg:14, displayNo:'W-TEST-14' },
-        { machineId:'W-TEST-18', type:'wash', capacityKg:18, displayNo:'W-TEST-1' },
-        { machineId:'W-TEST-27', type:'wash', capacityKg:27, displayNo:'W-TEST-27' },
-        { machineId:'D-TEST-14', type:'dry', capacityKg:14, displayNo:'D-TEST-14' },
-        { machineId:'D-TEST-21', type:'dry', capacityKg:21, displayNo:'D-TEST-21' },
-        { machineId:'D-TEST-25', type:'dry', capacityKg:25, displayNo:'D-TEST-25' }
+        { machineId:'W-1', type:'wash', capacityKg:9, displayNo:'1' },
+        { machineId:'W-2', type:'wash', capacityKg:9, displayNo:'2' },
+        { machineId:'W-3', type:'wash', capacityKg:14, displayNo:'3' },
+        { machineId:'W-4', type:'wash', capacityKg:14, displayNo:'4' },
+        { machineId:'W-5', type:'wash', capacityKg:18, displayNo:'5' },
+        { machineId:'W-6', type:'wash', capacityKg:27, displayNo:'6' },
+        { machineId:'D-7', type:'dry', capacityKg:14, displayNo:'7' },
+        { machineId:'D-8', type:'dry', capacityKg:14, displayNo:'8' },
+        { machineId:'D-9', type:'dry', capacityKg:21, displayNo:'9' },
+        { machineId:'D-10', type:'dry', capacityKg:21, displayNo:'10' },
+        { machineId:'D-11', type:'dry', capacityKg:25, displayNo:'11' },
+        { machineId:'D-12', type:'dry', capacityKg:14, displayNo:'12' },
+        { machineId:'W-13', type:'wash', capacityKg:14, displayNo:'13' },
+        { machineId:'D-14', type:'dry', capacityKg:14, displayNo:'14' },
+        { machineId:'W-15', type:'wash', capacityKg:14, displayNo:'15' }
       ];
       const orders = currentOrders();
       return definitions.map(machine => {
@@ -137,7 +163,7 @@
       const available = matches.filter(machine => !machine.busy);
       const buttonAction = stage === 'wash' ? 'start-wash' : 'start-dry';
       const options = matches.map(machine => '<option value="' + esc(machine.machineId) + '"'
-        + (machine.busy ? ' disabled' : '') + '>' + esc(machine.displayNo) + ' · ' + machine.capacityKg + ' กก.'
+        + (machine.busy ? ' disabled' : '') + '>ตู้ ' + esc(machine.displayNo) + ' · ' + machine.capacityKg + ' กก.'
         + (machine.busy ? ' · กำลังใช้งาน' + (machine.currentOrderId ? ' (' + esc(machine.currentOrderId) + ')' : '') : ' · ว่าง')
         + '</option>').join('');
       const message = matches.length === 0
@@ -148,7 +174,7 @@
       return '<div class="machine-control' + (available.length ? '' : ' unavailable') + '">'
         + '<label for="machine-' + esc(order.orderId) + '">เลือก' + type + ' · ' + capacity + ' กก.</label>'
         + '<select id="machine-' + esc(order.orderId) + '" data-machine-select="' + buttonAction + '"'
-        + (matches.length ? '' : ' disabled') + '><option value="">— เลือกเลขเครื่อง —</option>' + options + '</select>'
+        + (matches.length ? '' : ' disabled') + '><option value="">— เลือกหมายเลขตู้ —</option>' + options + '</select>'
         + '<small>' + message + '</small></div>';
     }
     function activeMachineLine(order) {
@@ -158,7 +184,7 @@
       const capacity = Number(stage === 'wash' ? order.washerKg : order.dryerKg);
       const number = order.machineNo || order.machineId;
       if (!number) return '<div class="machine-current missing"><span>ยังไม่พบเลขเครื่องของงานนี้</span><small>หยุดดำเนินการต่อและตรวจรายการเครื่อง/ตัวจับเวลา</small></div>';
-      return '<div class="machine-current"><span>' + type + 'ที่กำลังใช้งาน</span><strong>'
+      return '<div class="machine-current"><span>' + type + 'ที่กำลังใช้งาน</span><strong>ตู้ '
         + esc(number) + ' <small>· ' + capacity + ' กก.</small></strong></div>';
     }
     function actionsFor(o) {
