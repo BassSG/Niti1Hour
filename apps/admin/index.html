@@ -88,6 +88,7 @@
     ];
     let idToken = '';
     let liveOrders = [];
+    let liveMachines = [];
 
     function say(value, tone = '') {
       statusNode.textContent = value;
@@ -97,7 +98,7 @@
       return [
         { orderId:'DEMO-01', displayName:'ลูกค้าทดสอบ A', state:'awaiting_dropoff', washerKg:9, dryerKg:14, estimateBaht:110, supplyMode:'customer_own', paymentState:'unpaid' },
         { orderId:'DEMO-02', displayName:'ลูกค้าทดสอบ B', state:'payment_review', washerKg:14, dryerKg:21, estimateBaht:150, expectedAmountBaht:150, reportedAmountBaht:150, supplyMode:'customer_own', paymentState:'review' },
-        { orderId:'DEMO-03', displayName:'ลูกค้าทดสอบ C', state:'washing', washerKg:18, dryerKg:21, estimateBaht:170, supplyMode:'customer_own', paymentState:'verified', machineNo:'W-TEST-1', dueAt:new Date(Date.now()-60000).toISOString() },
+        { orderId:'DEMO-03', displayName:'ลูกค้าทดสอบ C', state:'washing', washerKg:18, dryerKg:21, estimateBaht:170, supplyMode:'customer_own', paymentState:'verified', machineId:'W-TEST-18', machineNo:'W-TEST-1', dueAt:new Date(Date.now()-60000).toISOString() },
         { orderId:'DEMO-04', displayName:'ลูกค้าทดสอบ D', state:'folding', washerKg:27, dryerKg:25, estimateBaht:220, supplyMode:'customer_own', paymentState:'verified' }
       ];
     }
@@ -111,6 +112,55 @@
       return initial;
     }
     function currentOrders() { return isDemo ? demoOrders() : liveOrders; }
+    function machineRoster() {
+      if (!isDemo) return liveMachines;
+      const definitions = [
+        { machineId:'W-TEST-9', type:'wash', capacityKg:9, displayNo:'W-TEST-9' },
+        { machineId:'W-TEST-14', type:'wash', capacityKg:14, displayNo:'W-TEST-14' },
+        { machineId:'W-TEST-18', type:'wash', capacityKg:18, displayNo:'W-TEST-1' },
+        { machineId:'W-TEST-27', type:'wash', capacityKg:27, displayNo:'W-TEST-27' },
+        { machineId:'D-TEST-14', type:'dry', capacityKg:14, displayNo:'D-TEST-14' },
+        { machineId:'D-TEST-21', type:'dry', capacityKg:21, displayNo:'D-TEST-21' },
+        { machineId:'D-TEST-25', type:'dry', capacityKg:25, displayNo:'D-TEST-25' }
+      ];
+      const orders = currentOrders();
+      return definitions.map(machine => {
+        const order = orders.find(item => ['washing','drying'].includes(item.state)
+          && (item.machineId === machine.machineId || item.machineNo === machine.displayNo));
+        return { ...machine, busy: Boolean(order), currentOrderId: order?.orderId || '' };
+      });
+    }
+    function machineControl(order, stage) {
+      const type = stage === 'wash' ? 'เครื่องซัก' : 'เครื่องอบ';
+      const capacity = Number(stage === 'wash' ? order.washerKg : order.dryerKg);
+      const matches = machineRoster().filter(machine => machine.type === stage && machine.capacityKg === capacity);
+      const available = matches.filter(machine => !machine.busy);
+      const buttonAction = stage === 'wash' ? 'start-wash' : 'start-dry';
+      const options = matches.map(machine => '<option value="' + esc(machine.machineId) + '"'
+        + (machine.busy ? ' disabled' : '') + '>' + esc(machine.displayNo) + ' · ' + machine.capacityKg + ' กก.'
+        + (machine.busy ? ' · กำลังใช้งาน' + (machine.currentOrderId ? ' (' + esc(machine.currentOrderId) + ')' : '') : ' · ว่าง')
+        + '</option>').join('');
+      const message = matches.length === 0
+        ? 'ยังไม่ได้ลงทะเบียน' + type + 'ขนาด ' + capacity + ' กก. ในระบบ กรุณาตั้งค่าแท็บ Machines ก่อนเริ่มงาน'
+        : available.length === 0
+          ? type + 'ขนาด ' + capacity + ' กก. กำลังใช้งานทั้งหมด กรุณาเลือกเมื่อมีเครื่องว่าง'
+          : 'เลือกเครื่องที่ว่างจริงก่อนเริ่มจับเวลา';
+      return '<div class="machine-control' + (available.length ? '' : ' unavailable') + '">'
+        + '<label for="machine-' + esc(order.orderId) + '">เลือก' + type + ' · ' + capacity + ' กก.</label>'
+        + '<select id="machine-' + esc(order.orderId) + '" data-machine-select="' + buttonAction + '"'
+        + (matches.length ? '' : ' disabled') + '><option value="">— เลือกเลขเครื่อง —</option>' + options + '</select>'
+        + '<small>' + message + '</small></div>';
+    }
+    function activeMachineLine(order) {
+      if (!['washing','drying'].includes(order.state)) return '';
+      const stage = order.state === 'washing' ? 'wash' : 'dry';
+      const type = stage === 'wash' ? 'เครื่องซัก' : 'เครื่องอบ';
+      const capacity = Number(stage === 'wash' ? order.washerKg : order.dryerKg);
+      const number = order.machineNo || order.machineId;
+      if (!number) return '<div class="machine-current missing"><span>ยังไม่พบเลขเครื่องของงานนี้</span><small>หยุดดำเนินการต่อและตรวจรายการเครื่อง/ตัวจับเวลา</small></div>';
+      return '<div class="machine-current"><span>' + type + 'ที่กำลังใช้งาน</span><strong>'
+        + esc(number) + ' <small>· ' + capacity + ' กก.</small></strong></div>';
+    }
     function actionsFor(o) {
       switch (o.state) {
         case 'awaiting_dropoff': return [['ยืนยันรับผ้า', 'dropoff']];
@@ -158,9 +208,12 @@
         const items = visible.filter(o => bucket.states.includes(o.state));
         if (items.length === 0) return '';
         const cards = items.map(o => {
+          const startStage = o.state === 'paid' ? 'wash' : o.state === 'drying_pending' ? 'dry' : '';
+          const machinePick = startStage ? machineControl(o, startStage) : '';
           const actionButtons = actionsFor(o).map(([label, slug]) =>
             '<button class="' + (slug === 'collect' ? 'secondary-button' : 'primary-button')
-            + '" data-id="' + esc(o.orderId) + '" data-action="' + slug + '">' + label + '</button>'
+            + '" data-id="' + esc(o.orderId) + '" data-action="' + slug + '"'
+            + (slug === 'start-wash' || slug === 'start-dry' ? ' disabled' : '') + '>' + label + '</button>'
           ).join('');
           const dueText = o.dueAt ? new Date(o.dueAt).toLocaleString('th-TH', { dateStyle:'short', timeStyle:'short' }) : '';
           const amount = o.estimateBaht == null ? 'รอยืนยันราคา' : money(o.estimateBaht);
@@ -177,6 +230,7 @@
             + ' กก. · ' + (o.supplyMode === 'customer_own' ? 'ลูกค้านำผลิตภัณฑ์มาเอง' : 'รอเสนอราคาผลิตภัณฑ์') + '</div>'
             + '<div class="job-row"><span class="state-chip">' + esc(stateNames[o.state] || 'กำลังดำเนินการ')
             + '</span><span>ชำระ: ' + payment + '</span></div>'
+            + activeMachineLine(o) + machinePick
             + review + (dueText ? '<div class="job-note">ครบเวลาโดยประมาณ ' + esc(dueText) + ' · ไม่ใช่เวลารับประกัน</div>' : '')
             + '<div class="job-actions">' + actionButtons + '</div></article>';
         }).join('');
@@ -195,10 +249,18 @@
       if (!response.ok || !result.ok) throw Error(result.error?.message || 'ทำรายการไม่สำเร็จ');
       return result.data;
     }
-    async function act(id, slug) {
+    async function act(id, slug, machineId = '') {
       const all = currentOrders();
       const order = all.find(o => o.orderId === id);
       if (!order) return;
+      let selectedMachine = null;
+      if (slug === 'start-wash' || slug === 'start-dry') {
+        const stage = slug === 'start-wash' ? 'wash' : 'dry';
+        const capacity = Number(stage === 'wash' ? order.washerKg : order.dryerKg);
+        selectedMachine = machineRoster().find(machine => machine.machineId === machineId && machine.type === stage
+          && machine.capacityKg === capacity && !machine.busy);
+        if (!selectedMachine) throw Error('กรุณาเลือกเครื่องที่ว่างและตรงกับขนาดงานก่อนเริ่ม');
+      }
       if (isDemo) {
         if (slug === 'dropoff') order.state = 'awaiting_quote';
         else if (slug === 'quote') order.state = order.supplyMode === 'shop_purchase_requested' ? 'awaiting_customer_quote_acceptance' : 'awaiting_payment';
@@ -209,15 +271,15 @@
         }
         else if (slug === 'verify-payment') { order.state = 'paid'; order.paymentState = 'verified'; }
         else if (slug === 'start-wash') {
-          order.state = 'washing'; order.machineNo = 'W-TEST-1';
+          order.state = 'washing'; order.machineId = selectedMachine.machineId; order.machineNo = selectedMachine.displayNo;
           order.dueAt = new Date(Date.now() + 1800000).toISOString();
         }
-        else if (slug === 'complete-wash') { order.state = 'drying_pending'; delete order.machineNo; delete order.dueAt; }
+        else if (slug === 'complete-wash') { order.state = 'drying_pending'; delete order.machineId; delete order.machineNo; delete order.dueAt; }
         else if (slug === 'start-dry') {
-          order.state = 'drying'; order.machineNo = 'D-TEST-1';
+          order.state = 'drying'; order.machineId = selectedMachine.machineId; order.machineNo = selectedMachine.displayNo;
           order.dueAt = new Date(Date.now() + 1800000).toISOString();
         }
-        else if (slug === 'complete-dry') { order.state = 'folding'; delete order.machineNo; delete order.dueAt; }
+        else if (slug === 'complete-dry') { order.state = 'folding'; delete order.machineId; delete order.machineNo; delete order.dueAt; }
         else if (slug === 'ready') { order.state = 'ready'; delete order.dueAt; }
         else if (slug === 'notify-ready') return say('DEMO: ไม่ได้ส่งข้อความ LINE จริง', 'ok');
         else if (slug === 'collect') order.state = 'collected';
@@ -250,12 +312,7 @@
         if (!Number.isFinite(amount) || amount <= 0) throw Error('กรุณากรอกยอดที่ตรวจจากบัญชี');
         body = { verifiedAmount: amount };
       }
-      if (slug === 'start-wash' || slug === 'start-dry') {
-        const raw = prompt('เลขเครื่อง' + (slug === 'start-wash' ? 'ซัก' : 'อบ') + ' ตามแท็บ Machines');
-        if (raw === null) return;
-        if (!raw.trim()) throw Error('กรุณาระบุเลขเครื่อง');
-        body = { machineNo: raw.trim() };
-      }
+      if (slug === 'start-wash' || slug === 'start-dry') body = { machineId: selectedMachine.machineId };
       if (slug === 'notify-ready' && !confirm('ยืนยันส่ง LINE แจ้งลูกค้าว่าผ้าพร้อมรับแล้ว?')) return;
       const result = await api('/api/admin/orders/' + encodeURIComponent(id) + '/' + slug, 'POST', body);
       if (result.message) say(result.message, 'ok');
@@ -265,16 +322,38 @@
       if (isDemo) { render(); return; }
       const result = await api('/api/admin/queue');
       liveOrders = result.orders || [];
+      liveMachines = result.machines || [];
       render();
       if (notify) say('อัปเดตข้อมูลแล้ว', 'ok');
     }
     document.querySelector('#queues').addEventListener('click', async event => {
       const button = event.target.closest('button[data-action]');
       if (!button) return;
+      const machineSelect = button.closest('.job')?.querySelector('[data-machine-select="' + button.dataset.action + '"]');
+      if ((button.dataset.action === 'start-wash' || button.dataset.action === 'start-dry') && !machineSelect?.value) {
+        say('เลือกเลขเครื่องที่ว่างก่อนเริ่มงานครับ', 'error');
+        return;
+      }
       button.disabled = true;
-      try { await act(button.dataset.id, button.dataset.action); }
-      catch (error) { say(error.message || 'ทำรายการไม่สำเร็จ', 'error'); }
-      finally { button.disabled = false; }
+      try { await act(button.dataset.id, button.dataset.action, machineSelect?.value || ''); }
+      catch (error) {
+        if (button.dataset.action === 'start-wash' || button.dataset.action === 'start-dry') {
+          await refresh(false).catch(() => {});
+        }
+        say(error.message || 'ทำรายการไม่สำเร็จ', 'error');
+      }
+      finally { if (button.isConnected) button.disabled = false; }
+    });
+    document.querySelector('#queues').addEventListener('change', event => {
+      const select = event.target.closest('select[data-machine-select]');
+      if (!select) return;
+      const button = select.closest('.job')?.querySelector('button[data-action="' + select.dataset.machineSelect + '"]');
+      if (button) {
+        button.disabled = !select.value;
+        const step = select.dataset.machineSelect === 'start-wash' ? 'เริ่มซัก' : 'เริ่มอบ';
+        const selectedNumber = select.selectedOptions[0]?.textContent.split(' · ')[0] || '';
+        button.textContent = select.value ? step + ' · ' + selectedNumber : step;
+      }
     });
     document.querySelector('#refresh').addEventListener('click', () => refresh().catch(error => say(error.message, 'error')));
     document.querySelector('#search').addEventListener('input', render);
