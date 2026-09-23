@@ -6,7 +6,7 @@ LINE OA เดิมเลือกเปิด LIFF ของบริการ
 
 ```text
 LINE OA → LIFF customer/admin → staging Worker → signed request → Apps Script → Niti1Hour Sheet
-                                                               └→ private Drive slip/photo folders
+        └→ ลูกค้าส่งสลิปในแชต OA เดิม → แอดมินบันทึกยอดที่แจ้ง → ตรวจเงินจริง
 ```
 
 ## Customer lifecycle
@@ -14,7 +14,7 @@ LINE OA → LIFF customer/admin → staging Worker → signed request → Apps S
 1. เลือกเครื่องซัก/อบและยอมรับเงื่อนไข → ส่งคำขอ ไม่ใช่ยืนยันบิล
 2. ร้านรับและตรวจผ้าจริง → ยืนยันเครื่อง/ราคา/จำนวนรอบ
 3. ถ้าร้านจัดหาน้ำยา ต้องแจ้งยอดเพิ่มและรอลูกค้ายืนยัน; ห้ามสร้างยอดสุดท้ายก่อนยืนยัน
-4. ลูกค้าชำระตามยอดที่ร้านยืนยันและแนบสลิป → `payment_review`
+4. ลูกค้าชำระตามยอดที่ร้านยืนยันและส่งสลิปในแชต LINE OA เดิม → แอดมินบันทึกยอดที่ลูกค้าแจ้ง → `payment_review`
 5. ร้านเทียบเงินจริง/ยอดบิล/ยอดแจ้ง แล้วแอดมินยืนยัน → `paid`
 6. แอดมินเลือกเลขเครื่องที่ว่างและกดเริ่มจริง → `washing` หรือ `drying`; timer เริ่มตอนนี้
 7. ครบเวลาเป็นเพียงการเตือนแอดมิน ไม่เปลี่ยน state; ซักเสร็จไป `drying_pending`; อบเสร็จไป `folding`
@@ -28,7 +28,7 @@ Manual-supply branch: `awaiting_quote → awaiting_customer_quote_acceptance →
 
 ## Data ownership
 
-The dedicated Sheet is the source of truth. `Sheet1` is preserved. New tabs are append-only transaction tables; row numbers are not business IDs. Prices are snapshotted per quote version. `Events` and `Idempotency` protect audit/retry behavior; `Migrations` records schema version. Slip/photo files must inherit private Drive folder permissions; the API returns a file only after verifying an admin LINE ID.
+The dedicated Sheet is the source of truth. `Sheet1` is preserved. New tabs are append-only transaction tables; row numbers are not business IDs. Prices are snapshotted per quote version. `Events` and `Idempotency` protect audit/retry behavior; `Migrations` records schema version. ผู้ใช้เลือกคงสิทธิ์ Drive แบบ Anyone with link และปิดอัปโหลดสลิปผ่านเว็บ จึงไม่มีเส้นทางอัปโหลด/เปิดภาพใน API หรือ Apps Script. แอดมินตรวจสลิปในแชต LINE OA และยอดเงินจริงจากบัญชีด้วยตนเอง.
 
 ## Price rules awaiting final owner confirmation
 

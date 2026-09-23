@@ -86,12 +86,8 @@ function routeSpec(method, pathname) {
   if (method === 'GET' && pathname === '/api/catalog') return { action: 'catalog', role: 'public' };
   if (method === 'POST' && pathname === '/api/orders') return { action: 'customer.createOrder', role: 'customer' };
   if (method === 'GET' && pathname === '/api/orders') return { action: 'customer.listOrders', role: 'customer' };
-  const customerAction = pathname.match(/^\/api\/orders\/([A-Za-z0-9_-]+)\/(payment|accept-supply|decline-supply)$/);
-  if (method === 'POST' && customerAction) return { action: 'customer.' + ({ payment: 'reportPayment', 'accept-supply': 'acceptSupplyQuote', 'decline-supply': 'declineSupplyQuote' }[customerAction[2]]), role: 'customer', orderId: customerAction[1] };
-  const customerSlip = pathname.match(/^\/api\/orders\/([A-Za-z0-9_-]+)\/slip$/);
-  if (method === 'POST' && customerSlip) return { action: 'customer.uploadSlip', role: 'customer', orderId: customerSlip[1] };
-  const adminSlip = pathname.match(/^\/api\/admin\/orders\/([A-Za-z0-9_-]+)\/slip$/);
-  if (method === 'GET' && adminSlip) return { action: 'admin.get-slip', role: 'admin', orderId: adminSlip[1] };
+  const customerAction = pathname.match(/^\/api\/orders\/([A-Za-z0-9_-]+)\/(accept-supply|decline-supply)$/);
+  if (method === 'POST' && customerAction) return { action: 'customer.' + ({ 'accept-supply': 'acceptSupplyQuote', 'decline-supply': 'declineSupplyQuote' }[customerAction[2]]), role: 'customer', orderId: customerAction[1] };
   const adminId = pathname.match(/^\/api\/admin\/orders\/([A-Za-z0-9_-]+)\/([a-z-]+)$/);
   if (method === 'POST' && adminId) return { action: 'admin.' + adminId[2], role: 'admin', orderId: adminId[1] };
   if (method === 'GET' && pathname === '/api/admin/queue') return { action: 'admin.queue', role: 'admin' };

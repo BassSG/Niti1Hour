@@ -23,10 +23,12 @@ test('LINE ID-token verification rejects an audience mismatch and an expired tok
   await assert.rejects(lineSubject(request, { LIFF_ID: '1234567890' }, expired), { code: 'LINE_TOKEN_INVALID' });
 });
 
-test('write routes remain distinct from public catalog and map to explicit backend actions', () => {
+test('payment slips stay outside the app while admin can record LINE chat reports', () => {
   assert.deepEqual(routeSpec('GET', '/api/catalog'), { action: 'catalog', role: 'public' });
-  assert.deepEqual(routeSpec('POST', '/api/orders/WD-260923-ABC123/slip'), { action: 'customer.uploadSlip', role: 'customer', orderId: 'WD-260923-ABC123' });
-  assert.deepEqual(routeSpec('GET', '/api/admin/orders/WD-1/slip'), { action: 'admin.get-slip', role: 'admin', orderId: 'WD-1' });
+  assert.deepEqual(routeSpec('POST', '/api/admin/orders/WD-1/report-payment-from-chat'), { action: 'admin.report-payment-from-chat', role: 'admin', orderId: 'WD-1' });
+  assert.equal(routeSpec('POST', '/api/orders/WD-260923-ABC123/slip'), null);
+  assert.equal(routeSpec('GET', '/api/admin/orders/WD-1/slip'), null);
+  assert.equal(routeSpec('POST', '/api/orders/WD-1/payment'), null);
   assert.equal(routeSpec('DELETE', '/api/orders/WD-1'), null);
 });
 

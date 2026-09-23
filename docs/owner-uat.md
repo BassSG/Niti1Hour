@@ -18,7 +18,7 @@ This checklist is mandatory. A successful staging/demo deploy is not a productio
 - [ ] Configure verified admin LINE user IDs and decide Owner/Staff roles.
 - [ ] Configure PromptPay recipient/QR approach and verify amount/recipient before showing any payment QR.
 - [ ] Approve customer terms: sorting/color bleed, care-label, drying outcome, items not accepted, and claim/compensation wording.
-- [ ] Verify parent Drive folder and child folders are private and accessible only to intended staff.
+- [x] Owner chose to retain Anyone-with-link viewer access on the supplied Drive folders; web upload and retrieval remain disabled.
 
 ## C. Staging test (no real customer data)
 
@@ -27,18 +27,19 @@ This checklist is mandatory. A successful staging/demo deploy is not a productio
 - [ ] Try all combinations; higher service tier controls fee.
 - [ ] Create/advance only demo orders; verify customer-order state labels and all admin queue buckets.
 - [ ] Test manual supply quote: no total/payment until customer accepts.
-- [ ] Test admin sees slip only after admin authentication; invalid/non-admin gets denied.
+- [ ] Test that slip upload and retrieval URLs have no route and the customer page has no upload control.
+- [ ] Test admin can record the amount a customer reports in the LINE OA chat only when it matches the confirmed bill; test actual bank verification separately.
 - [ ] Check timers start only on actual machine start and complete without auto-advancing or customer notification.
 - [ ] Check ready notice requires a separate explicit click; collect removes from open queue but retains history.
-- [ ] Test double-click, retry, wrong/expired LINE token, oversized/unsupported file, slow network, mobile and desktop.
+- [ ] Test double-click, retry, wrong/expired LINE token, slow network, mobile and desktop.
 
 ## D. Real UAT after configuration
 
-Use owner/staff LINE accounts and an explicitly labeled test order; do not message ordinary customers. Verify actual money is not accepted automatically, LINE notice reaches only the correct test account, image stays private, and old dry-cleaning/pressing workflows still work unchanged.
+Use owner/staff LINE accounts and an explicitly labeled test order; do not message ordinary customers. Verify actual money is not accepted automatically, LINE notice reaches only the correct test account, no images are stored in the link-shared Drive folders, and old dry-cleaning/pressing workflows still work unchanged.
 
 ## E. Production approval gate
 
-Only after every required test above passes, the owner explicitly approves go-live. Before changing any Rich Menu/webhook, save current menu IDs/aliases, default and per-user assignments, webhook destination and existing deployment identifier; test the replacement against a controlled account. Do not switch webhook merely to receive slips—the current design accepts slips in LIFF. Have the rollback procedure open and verified.
+Only after every required test above passes, the owner explicitly approves go-live. Before changing any Rich Menu/webhook, save current menu IDs/aliases, default and per-user assignments, webhook destination and existing deployment identifier; test the replacement against a controlled account. Keep slip exchange in the existing LINE OA chat. Have the rollback procedure open and verified.
 
 ## F. What staging is not
 

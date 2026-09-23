@@ -61,7 +61,7 @@ function setupSchema() {
     var nonempty=existing.some(function(v){return String(v).trim()!=='';});
     if(nonempty && JSON.stringify(existing)!==JSON.stringify(headers)) throw new Error('Schema header mismatch: '+name);
     if(!nonempty) sh.getRange(1,1,1,headers.length).setValues([headers]);
-    sh.setFrozenRows(1); sh.getRange(1,1,1,headers.length).setFontWeight('bold').setBackground('#a74429').setFontColor('#ffffff');
+    sh.setFrozenRows(1); sh.getRange(1,1,1,headers.length).setFontWeight('bold').setBackground('#172c38').setFontColor('#ffffff');
   });
   ss.setSpreadsheetTimeZone('Asia/Bangkok');
   seedSettings_(ss);
@@ -74,14 +74,12 @@ function dispatch_(action,payload,actor,cfg,requestId) {
   if(action==='catalog') return catalog_();
   if(action==='customer.createOrder') return createOrder_(payload,actor,requestId);
   if(action==='customer.listOrders') return customerOrders_(actor);
-  if(action==='customer.uploadSlip') return uploadSlip_(payload,actor,cfg,requestId);
-  if(action==='customer.reportPayment') return reportPayment_(payload,actor,requestId);
   if(action==='customer.acceptSupplyQuote') return acceptSupplyQuote_(payload,actor,requestId,true);
   if(action==='customer.declineSupplyQuote') return acceptSupplyQuote_(payload,actor,requestId,false);
   if(action==='admin.queue') return adminQueue_();
-  if(action==='admin.get-slip') return getSlip_(payload);
   if(action==='admin.dropoff') return setDropoff_(payload,actor,requestId);
   if(action==='admin.quote') return setQuote_(payload,actor,requestId);
+  if(action==='admin.report-payment-from-chat') return recordChatPayment_(payload,actor,requestId);
   if(action==='admin.verify-payment') return verifyPayment_(payload,actor,requestId);
   if(action==='admin.start-wash') return startMachine_(payload,actor,requestId,'wash');
   if(action==='admin.complete-wash') return completeMachine_(payload,actor,requestId,'wash');
@@ -99,7 +97,7 @@ function dispatch_(action,payload,actor,cfg,requestId) {
 
 function config_() {
   var p=PropertiesService.getScriptProperties();
-  return {sheetId:p.getProperty('VALET_SHEET_ID')||'',driveRootId:p.getProperty('VALET_DRIVE_ROOT_ID')||'',slipsFolderId:p.getProperty('VALET_SLIPS_FOLDER_ID')||'',photosFolderId:p.getProperty('VALET_PHOTOS_FOLDER_ID')||'',sharedSecret:p.getProperty('VALET_SHARED_SECRET')||'',adminLineIds:(p.getProperty('VALET_ADMIN_LINE_IDS')||'').split(',').map(function(x){return x.trim();}).filter(Boolean)};
+  return {sheetId:p.getProperty('VALET_SHEET_ID')||'',sharedSecret:p.getProperty('VALET_SHARED_SECRET')||'',adminLineIds:(p.getProperty('VALET_ADMIN_LINE_IDS')||'').split(',').map(function(x){return x.trim();}).filter(Boolean)};
 }
 function authorize_(action,actor,cfg) {
   if(action==='catalog') return;
@@ -109,7 +107,7 @@ function authorize_(action,actor,cfg) {
   if(action.indexOf('customer.')===0 && actor.role==='customer' && actor.lineUserId) return;
   throw apiError_('FORBIDDEN','ไม่มีสิทธิ์ทำรายการนี้',403);
 }
-function isWrite_(action) { return action!=='catalog'&&action!=='customer.listOrders'&&action!=='admin.queue'&&action!=='admin.get-slip'&&action!=='admin.dueTimers'&&action!=='system.dueTimers'; }
+function isWrite_(action) { return action!=='catalog'&&action!=='customer.listOrders'&&action!=='admin.queue'&&action!=='admin.dueTimers'&&action!=='system.dueTimers'; }
 function idempotent_(message,actor,work) {
   var id=String(message.requestId||''); if(!id) throw apiError_('REQUEST_ID_REQUIRED','ไม่พบรหัสคำขอ',400);
   var rows=table_('Idempotency');
@@ -175,13 +173,15 @@ function acceptSupplyQuote_(p,actor,requestId,accept) {
   q=quoteCalc_(Number(q.washerKg),Number(q.dryerKg),o.supply_mode,Number(q.supplyBaht),true,true);
   update_('Orders',o._row,{state:'awaiting_payment',quote_json:JSON.stringify(q),quote_total_baht:q.totalBaht,confirmed_at:now_(),updated_at:now_(),row_version:Number(o.row_version)+1,last_request_id:requestId});event_(o.order_id,actor.lineUserId,'customer.acceptSupplyQuote',publicOrder_(o),{state:'awaiting_payment',quote:q},requestId);return {state:'awaiting_payment',quote:q,message:'ยืนยันยอดแล้ว กรุณาชำระก่อนร้านเริ่มงาน'};
 }
-function reportPayment_(p,actor,requestId) {
-  var o=order_(p.orderId),c=table_('Customers').find(function(x){return x.customer_id===o.customer_id;});if(!c||c.line_user_id!==actor.lineUserId)throw apiError_('NOT_FOUND','ไม่พบรายการนี้',404);
-  if(o.state!=='awaiting_payment')throw apiError_('INVALID_STATE','รายการนี้ยังไม่อยู่ในขั้นแจ้งชำระ',409);
-  var amount=Number(p.reportedAmount),expected=Number(o.quote_total_baht);if(!isFinite(amount)||amount<=0)throw apiError_('INVALID_AMOUNT','ยอดที่แจ้งไม่ถูกต้อง',400);
-  var slip=table_('Files').find(function(f){return f.file_id===String(p.slipFileId)&&f.order_id===o.order_id&&f.kind==='payment_slip';});if(!slip)throw apiError_('SLIP_REQUIRED','กรุณาแนบสลิปก่อนแจ้งโอน',400);
-  var paymentId=uuid_();append_('Payments',{payment_id:paymentId,order_id:o.order_id,expected_amount_baht:expected,reported_amount_baht:amount,verified_amount_baht:'',status:'review',slip_file_id:slip.file_id,reported_at:now_(),verified_by:'',verified_at:'',request_id:requestId});
-  update_('Orders',o._row,{state:'payment_review',payment_state:'review',updated_at:now_(),row_version:Number(o.row_version)+1,last_request_id:requestId});event_(o.order_id,actor.lineUserId,'customer.reportPayment',publicOrder_(o),{paymentId:paymentId,state:'payment_review'},requestId);return {paymentId:paymentId,state:'payment_review',message:'ส่งหลักฐานแล้ว รอร้านตรวจยอดเงินจริง'};
+function recordChatPayment_(p,actor,requestId) {
+  var o=order_(p.orderId);if(o.state!=='awaiting_payment')throw apiError_('INVALID_STATE','รายการนี้ยังไม่อยู่ในขั้นแจ้งชำระ',409);
+  var amount=Number(p.reportedAmount),expected=Number(o.quote_total_baht);
+  if(!isFinite(amount)||amount<=0)throw apiError_('INVALID_AMOUNT','ยอดที่ลูกค้าแจ้งไม่ถูกต้อง',400);
+  if(amount!==expected)throw apiError_('AMOUNT_MISMATCH','ยอดในแชตไม่ตรงกับยอดบิล กรุณาตรวจสอบก่อนบันทึก',409);
+  var paymentId=uuid_();append_('Payments',{payment_id:paymentId,order_id:o.order_id,expected_amount_baht:expected,reported_amount_baht:amount,verified_amount_baht:'',status:'review',slip_file_id:'',reported_at:now_(),verified_by:'',verified_at:'',request_id:requestId});
+  update_('Orders',o._row,{state:'payment_review',payment_state:'review',updated_at:now_(),row_version:Number(o.row_version)+1,last_request_id:requestId});
+  event_(o.order_id,actor.lineUserId,'admin.report-payment-from-chat',publicOrder_(o),{paymentId:paymentId,state:'payment_review',source:'line_oa_chat'},requestId);
+  return {paymentId:paymentId,state:'payment_review',message:'บันทึกยอดที่แจ้งในแชตแล้ว กรุณาตรวจยอดเงินจริงในบัญชีก่อนยืนยัน'};
 }
 function verifyPayment_(p,actor,requestId) {
   var o=order_(p.orderId);if(o.state!=='payment_review')throw apiError_('INVALID_STATE','รายการนี้ไม่มีรายการรอตรวจเงิน',409);
@@ -218,23 +218,10 @@ function recordReadyNotice_(p,actor,requestId){var o=order_(p.orderId);if(o.stat
 function collect_(p,actor,requestId) {
   var o=order_(p.orderId);if(o.state!=='ready')throw apiError_('INVALID_STATE','งานยังไม่อยู่ในขั้นพร้อมรับ',409);update_('Orders',o._row,{state:'collected',collected_at:now_(),updated_at:now_(),row_version:Number(o.row_version)+1,last_request_id:requestId});event_(o.order_id,actor.lineUserId,'admin.collect',publicOrder_(o),{state:'collected'},requestId);return {state:'collected',message:'บันทึกรับผ้าแล้ว'};
 }
-function uploadSlip_(p,actor,cfg,requestId) {
-  var o=order_(p.orderId),c=table_('Customers').find(function(x){return x.customer_id===o.customer_id;});if(!c||c.line_user_id!==actor.lineUserId)throw apiError_('NOT_FOUND','ไม่พบรายการนี้',404);if(o.state!=='awaiting_payment')throw apiError_('INVALID_STATE','ยังไม่สามารถแนบสลิปในสถานะนี้',409);
-  var folderId=cfg.slipsFolderId;if(!folderId)throw apiError_('DRIVE_NOT_CONFIGURED','ยังไม่ได้ตั้งค่าโฟลเดอร์สลิป',503);var mime=String(p.mimeType||''),data=String(p.base64||'');if(['image/jpeg','image/png','image/webp'].indexOf(mime)<0)throw apiError_('INVALID_FILE_TYPE','รองรับเฉพาะรูป JPG, PNG หรือ WebP',400);if(!data||data.length>7*1024*1024)throw apiError_('INVALID_FILE_SIZE','ไฟล์ว่างหรือใหญ่เกิน 5 MB',413);
-  var bytes=Utilities.base64Decode(data);if(bytes.length>5*1024*1024)throw apiError_('INVALID_FILE_SIZE','รูปต้องมีขนาดไม่เกิน 5 MB',413);
-  var ext=mime==='image/jpeg'?'jpg':mime==='image/png'?'png':'webp',blob=Utilities.newBlob(bytes,mime,'slip-'+o.order_id+'-'+uuid_().slice(0,8)+'.'+ext),file=DriveApp.getFolderById(folderId).createFile(blob);
-  var fileId=uuid_();append_('Files',{file_id:fileId,order_id:o.order_id,kind:'payment_slip',drive_file_id:file.getId(),mime_type:mime,byte_size:bytes.length,uploaded_at:now_(),uploader:actor.lineUserId});event_(o.order_id,actor.lineUserId,'customer.uploadSlip',{fileId:fileId},{fileId:fileId},requestId);return {slipFileId:fileId,message:'อัปโหลดสลิปแล้ว กรุณากดแจ้งโอนเพื่อให้ร้านตรวจ'};
-}
-function getSlip_(p) {
-  var o=order_(p.orderId),slip=table_('Files').filter(function(f){return f.order_id===o.order_id&&f.kind==='payment_slip';}).pop();
-  if(!slip) throw apiError_('SLIP_NOT_FOUND','ยังไม่มีสลิปแนบในรายการนี้',404);
-  var blob=DriveApp.getFileById(slip.drive_file_id).getBlob();
-  return {orderId:o.order_id,mimeType:blob.getContentType(),base64:Utilities.base64Encode(blob.getBytes()),fileId:slip.file_id};
-}
 function adminQueue_() {
   var orders=table_('Orders').filter(function(o){return ['collected','cancelled'].indexOf(o.state)<0;}).sort(function(a,b){return String(a.created_at).localeCompare(String(b.created_at));});
-  var customers=table_('Customers'),timers=table_('Timers'),machines=table_('Machines'),payments=table_('Payments'),files=table_('Files');
-  return {orders:orders.map(function(o){var c=customers.find(function(x){return x.customer_id===o.customer_id;}),q=o.quote_json?JSON.parse(o.quote_json):null,activeTimers=timers.filter(function(t){return t.order_id===o.order_id&&!t.completed_at;}),t=activeTimers[activeTimers.length-1],m=t&&machines.find(function(x){return x.machine_id===t.machine_id;}),reviews=payments.filter(function(x){return x.order_id===o.order_id&&x.status==='review';}),pay=reviews[reviews.length-1];return {orderId:o.order_id,displayName:c&&c.display_name||'ลูกค้า LINE',state:o.state,washerKg:Number(o.washer_kg||o.requested_washer_kg),dryerKg:Number(o.dryer_kg||o.requested_dryer_kg),estimateBaht:q&&q.totalBaht!==null?q.totalBaht:null,supplyBaht:q&&q.supplyBaht!==null?Number(q.supplyBaht):null,supplyMode:o.supply_mode,paymentState:o.payment_state,expectedAmountBaht:pay?Number(pay.expected_amount_baht):null,reportedAmountBaht:pay?Number(pay.reported_amount_baht):null,hasSlip:files.some(function(f){return f.order_id===o.order_id&&f.kind==='payment_slip';}),machineNo:m&&m.display_no||'',dueAt:t&&t.due_at||'',rowVersion:Number(o.row_version)};})};
+  var customers=table_('Customers'),timers=table_('Timers'),machines=table_('Machines'),payments=table_('Payments');
+  return {orders:orders.map(function(o){var c=customers.find(function(x){return x.customer_id===o.customer_id;}),q=o.quote_json?JSON.parse(o.quote_json):null,activeTimers=timers.filter(function(t){return t.order_id===o.order_id&&!t.completed_at;}),t=activeTimers[activeTimers.length-1],m=t&&machines.find(function(x){return x.machine_id===t.machine_id;}),reviews=payments.filter(function(x){return x.order_id===o.order_id&&x.status==='review';}),pay=reviews[reviews.length-1];return {orderId:o.order_id,displayName:c&&c.display_name||'ลูกค้า LINE',state:o.state,washerKg:Number(o.washer_kg||o.requested_washer_kg),dryerKg:Number(o.dryer_kg||o.requested_dryer_kg),estimateBaht:q&&q.totalBaht!==null?q.totalBaht:null,supplyBaht:q&&q.supplyBaht!==null?Number(q.supplyBaht):null,supplyMode:o.supply_mode,paymentState:o.payment_state,expectedAmountBaht:pay?Number(pay.expected_amount_baht):null,reportedAmountBaht:pay?Number(pay.reported_amount_baht):null,machineNo:m&&m.display_no||'',dueAt:t&&t.due_at||'',rowVersion:Number(o.row_version)};})};
 }
 function dueTimers_() {var now=Date.now();return {timers:table_('Timers').filter(function(t){return !t.completed_at&&!t.reminder_sent_at&&Date.parse(t.due_at)<=now;}).map(function(t){var m=table_('Machines').find(function(x){return x.machine_id===t.machine_id;});return {timerId:t.timer_id,orderId:t.order_id,stage:t.stage,machineId:t.machine_id,machineDisplayNo:m&&m.display_no||'ไม่ระบุ',dueAt:t.due_at};})};}
 function claimDueTimer_(p,requestId) {
