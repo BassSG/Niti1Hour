@@ -28,15 +28,15 @@ async function hmac(secret, value) {
 }
 
 async function lineSubject(request, env, fetchImpl = fetch) {
-  if (!env.LIFF_ID) throw Object.assign(new Error('LINE LIFF ยังไม่ได้ตั้งค่า'), { status: 503, code: 'LINE_NOT_CONFIGURED' });
+  if (!env.LINE_LOGIN_CHANNEL_ID) throw Object.assign(new Error('LINE Login channel ยังไม่ได้ตั้งค่า'), { status: 503, code: 'LINE_NOT_CONFIGURED' });
   const auth = request.headers.get('authorization') || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
   if (!token || token.length > 8192) throw Object.assign(new Error('กรุณาเปิดบริการผ่าน LINE เพื่อยืนยันตัวตน'), { status: 401, code: 'LINE_LOGIN_REQUIRED' });
-  const form = new URLSearchParams({ id_token: token, client_id: env.LIFF_ID });
+  const form = new URLSearchParams({ id_token: token, client_id: env.LINE_LOGIN_CHANNEL_ID });
   const response = await fetchImpl(LINE_VERIFY_URL, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: form });
   if (!response.ok) throw Object.assign(new Error('ยืนยันตัวตน LINE ไม่สำเร็จ กรุณาเข้าใหม่อีกครั้ง'), { status: 401, code: 'LINE_TOKEN_INVALID' });
   const claims = await response.json();
-  if (claims.iss !== 'https://access.line.me' || !claims.sub || claims.aud !== env.LIFF_ID || Number(claims.exp) <= Math.floor(Date.now() / 1000)) {
+  if (claims.iss !== 'https://access.line.me' || !claims.sub || claims.aud !== env.LINE_LOGIN_CHANNEL_ID || Number(claims.exp) <= Math.floor(Date.now() / 1000)) {
     throw Object.assign(new Error('ข้อมูลยืนยันตัวตน LINE ไม่ถูกต้อง'), { status: 401, code: 'LINE_TOKEN_INVALID' });
   }
   return { lineUserId: claims.sub, displayName: typeof claims.name === 'string' ? claims.name : '' };
@@ -253,9 +253,10 @@ async function handleApi(request, env, ctx) {
   }
 }
 
-function applyPublicConfig(response, env) {
+function applyPublicConfig(response, env, pathname) {
   return response.text().then((html) => {
-    const config = { liffId: env.LIFF_ID || '', demo: String(env.DEMO_MODE).toLowerCase() === 'true' };
+    const liffId = pathname === '/admin/' ? env.ADMIN_LIFF_ID || env.LIFF_ID : env.CUSTOMER_LIFF_ID || env.LIFF_ID;
+    const config = { liffId: liffId || '', demo: String(env.DEMO_MODE).toLowerCase() === 'true' };
     const snippet = '<script>window.NITI_CONFIG=' + JSON.stringify(config).replace(/</g, '\\u003c') + ';</script>';
     return new Response(html.replace('</head>', snippet + '</head>'), {
       status: response.status,
@@ -276,7 +277,7 @@ async function fetchHandler(request, env, ctx) {
   if (url.pathname === '/admin' || url.pathname === '/admin/index.html') url.pathname = '/admin/';
   const asset = await env.ASSETS.fetch(new Request(url, request));
   if (asset.status === 404) return safeError('PAGE_NOT_FOUND', 'ไม่พบหน้าที่ต้องการ', 404);
-  if (/^\/(customer|admin)\/$/.test(url.pathname)) return applyPublicConfig(asset, env);
+  if (/^\/(customer|admin)\/$/.test(url.pathname)) return applyPublicConfig(asset, env, url.pathname);
   return asset;
 }
 

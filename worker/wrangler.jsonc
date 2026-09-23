@@ -11,6 +11,9 @@
   "triggers": { "crons": ["* * * * *"] },
   "vars": {
     "DEMO_MODE": "true",
-    "DEPLOYMENT_SHA": "staging"
+    "DEPLOYMENT_SHA": "staging",
+    "LINE_LOGIN_CHANNEL_ID": "2011712978",
+    "CUSTOMER_LIFF_ID": "2011712978-YfVzJ8rn",
+    "ADMIN_LIFF_ID": "2011712978-lnzgYFc8"
   }
 }

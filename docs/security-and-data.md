@@ -2,7 +2,7 @@
 
 - No token, channel secret, HMAC secret, account number, or admin ID belongs in Git, static assets, Sheet cells, logs, or chat.
 - Worker↔Apps Script uses timestamp + random nonce + HMAC-SHA256; Apps Script rejects expired/replayed requests and writes under a script lock with an idempotency ledger.
-- LINE identity is taken from the server-verified ID token payload (`iss`, `sub`, `aud`, `exp`), never from a user ID supplied by the browser. Admin writes require a verified ID on an allowlist.
+- LINE identity is taken from the server-verified ID token payload (`iss`, `sub`, `aud`, `exp`), never from a user ID supplied by the browser. The verify API `client_id` and token `aud` must match `LINE_LOGIN_CHANNEL_ID` (the numeric LINE Login channel ID), not the LIFF app ID. The customer and admin pages can use separate `CUSTOMER_LIFF_ID` and `ADMIN_LIFF_ID` values from that same channel. Admin writes require a verified ID on an allowlist.
 - Owner chose to retain Anyone-with-link viewer access on the supplied Drive folders. The web/API/Apps Script slip upload and retrieval actions are disabled. Customers send slips to the existing LINE OA chat; admins compare the chat report, bill, and actual bank receipt before confirming payment.
 - Log only request ID, action, status, and error code; do not log tokens, image contents, full LINE payloads, or bank credentials.
 - The shop PromptPay recipient must be stored only as the Cloudflare Worker secret `PROMPTPAY_ID`. Never expose it through `NITI_CONFIG`, HTML, the source repository, or logs. The customer QR endpoint verifies the LINE customer and retrieves the amount from that customer's server-side order before producing the amount-prefilled payload.

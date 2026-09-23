@@ -10,7 +10,7 @@ test('LINE ID-token verification uses verified issuer, audience, subject, and ex
     return Response.json({ iss: 'https://access.line.me', sub: 'U-demo-user', aud: '1234567890', exp: Math.floor(Date.now() / 1000) + 120 });
   };
   const request = new Request('https://staging.example/api/orders', { method: 'POST', headers: { authorization: 'Bearer test-id-token' }, body: '{}' });
-  const subject = await lineSubject(request, { LIFF_ID: '1234567890' }, fetchStub);
+  const subject = await lineSubject(request, { LINE_LOGIN_CHANNEL_ID: '1234567890', LIFF_ID: '1234567890-AbcdEfgh' }, fetchStub);
   assert.equal(subject.lineUserId, 'U-demo-user');
   assert.equal(requestBody.get('id_token'), 'test-id-token');
   assert.equal(requestBody.get('client_id'), '1234567890');
@@ -19,9 +19,10 @@ test('LINE ID-token verification uses verified issuer, audience, subject, and ex
 test('LINE ID-token verification rejects an audience mismatch and an expired token', async () => {
   const request = new Request('https://staging.example/api/orders', { method: 'POST', headers: { authorization: 'Bearer test-id-token' }, body: '{}' });
   const invalidAudience = async () => Response.json({ iss: 'https://access.line.me', sub: 'U-demo-user', aud: 'wrong', exp: Math.floor(Date.now() / 1000) + 120 });
-  await assert.rejects(lineSubject(request, { LIFF_ID: '1234567890' }, invalidAudience), { code: 'LINE_TOKEN_INVALID' });
+  await assert.rejects(lineSubject(request, { LINE_LOGIN_CHANNEL_ID: '1234567890' }, invalidAudience), { code: 'LINE_TOKEN_INVALID' });
   const expired = async () => Response.json({ iss: 'https://access.line.me', sub: 'U-demo-user', aud: '1234567890', exp: Math.floor(Date.now() / 1000) - 1 });
-  await assert.rejects(lineSubject(request, { LIFF_ID: '1234567890' }, expired), { code: 'LINE_TOKEN_INVALID' });
+  await assert.rejects(lineSubject(request, { LINE_LOGIN_CHANNEL_ID: '1234567890' }, expired), { code: 'LINE_TOKEN_INVALID' });
+  await assert.rejects(lineSubject(request, { LIFF_ID: '1234567890-AbcdEfgh' }, async () => { throw Error('must not call LINE'); }), { code: 'LINE_NOT_CONFIGURED' });
 });
 
 test('payment slips stay outside the app while admin can record LINE chat reports', () => {
@@ -84,14 +85,19 @@ test('demo API exposes catalog but rejects every write without contacting real s
   assert.equal((await paymentQr.json()).error.code, 'DEMO_READ_ONLY');
 });
 
-test('customer and admin pages receive only public demo configuration', async () => {
+test('customer and admin pages receive route-specific LIFF IDs without exposing channel settings', async () => {
   const env = {
-    DEMO_MODE: 'true', LIFF_ID: '',
+    DEMO_MODE: 'true', LINE_LOGIN_CHANNEL_ID: '1234567890', CUSTOMER_LIFF_ID: '1234567890-customer', ADMIN_LIFF_ID: '1234567890-admin',
     ASSETS: { fetch: async () => new Response('<html><head></head><body>demo</body></html>', { headers: { 'content-type': 'text/html' } }) },
   };
-  const response = await worker.fetch(new Request('https://stage.example/admin/'), env, {});
-  const html = await response.text();
-  assert.equal(response.status, 200);
-  assert.match(html, /"demo":true/);
-  assert.match(html, /"liffId":""/);
+  const customer = await worker.fetch(new Request('https://stage.example/customer/'), env, {});
+  const customerHtml = await customer.text();
+  const admin = await worker.fetch(new Request('https://stage.example/admin/'), env, {});
+  const adminHtml = await admin.text();
+  assert.equal(customer.status, 200);
+  assert.equal(admin.status, 200);
+  assert.match(customerHtml, /"demo":true/);
+  assert.match(customerHtml, /"liffId":"1234567890-customer"/);
+  assert.match(adminHtml, /"liffId":"1234567890-admin"/);
+  assert.doesNotMatch(customerHtml + adminHtml, /LINE_LOGIN_CHANNEL_ID/);
 });

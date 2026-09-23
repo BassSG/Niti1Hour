@@ -14,7 +14,8 @@ This checklist is mandatory. A successful staging/demo deploy is not a productio
 
 - [ ] Confirm 30/40/50 service fee mapping and whether any order can use multiple cycles. Current implementation is single wash + single dry cycle.
 - [ ] Provide/enter real washer/dryer display numbers and capacity mapping in `Machines`.
-- [ ] Configure LIFF ID and verify it belongs to the same LINE provider as the OA Messaging API channel.
+- [x] Created a separate LINE Login channel `2011712978` (“นิติ รีดเรียบ บริการ”) under provider EBassWave and linked it to `@031zrlhu/นิติ รีดเรียบ`. Customer LIFF `2011712978-YfVzJ8rn` points to `/customer/`; admin LIFF `2011712978-lnzgYFc8` points to `/admin/`. Both request only `openid`, have the add-friend prompt off, and remain on a Developing channel and DEMO website. The unrelated `2006452639` (“LIFF TEST”) channel was not changed.
+- [ ] Before real use, publish the new LINE Login channel after owner UAT, test both LIFF URLs with controlled LINE accounts, verify the admin allowlist, and approve the switch from DEMO to live. Creating LIFF apps alone does not configure a Rich Menu or make the service live.
 - [ ] Verify the intended single admin LINE account is a friend of this OA and configure it as Worker secret `ADMIN_NOTIFY_USER_ID`; separately configure the admin allowlist in Worker and Apps Script.
 - [ ] Rotate the channel access token that was shared in chat, then store the replacement only as Worker secret `LINE_CHANNEL_ACCESS_TOKEN`. Check that the Messaging API channel is the shop's intended OA.
 - [ ] Provide the shop's original, unredacted PromptPay QR or recipient ID; set only the ID as Cloudflare Worker secret `PROMPTPAY_ID` (never in source/HTML/logs).
