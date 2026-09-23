@@ -32,7 +32,7 @@
       <div class="hero-art" aria-hidden="true"><div class="drum"></div><span class="art-spark one">✦</span></div>
     </section>
 
-    <div class="work-note"><b>การคุมเวลา</b><span>ครบเวลาเครื่องจะเตือนแอดมินให้ตรวจงาน ขั้นตอนถัดไปและการแจ้งลูกค้าต้องให้คนกดยืนยันหลังตรวจจริง</span></div>
+    <div class="work-note"><b>การคุมเวลา</b><span>เตือนแอดมินเมื่อเครื่องใกล้เสร็จ · ตรวจเครื่องจริงก่อนกดขั้นตอนถัดไป ลูกค้าจะได้รับแจ้งหลังพับเสร็จเท่านั้น</span></div>
     <section id="summary" class="metrics" aria-label="ภาพรวมคิวงาน"></section>
     <section id="duePanel" class="surface due-panel" hidden>
       <h2>ครบเวลาเครื่อง · รอตรวจหน้างาน</h2>
@@ -43,6 +43,12 @@
       <span class="overline">คิวหน้าร้าน</span>
       <h2>งานที่ต้องดำเนินการ</h2>
       <p>ค้นหาเลขงานหรือลูกค้า แล้วกดขั้นตอนถัดไปจากการ์ดงาน</p>
+    </div>
+    <div class="stage-legend" aria-label="สีประจำขั้นตอนงาน">
+      <span class="stage-intake">รับผ้า</span><span class="stage-quote">ตรวจผ้า</span>
+      <span class="stage-payment">ตรวจเงิน</span><span class="stage-wash">ซัก</span>
+      <span class="stage-dry">อบ</span><span class="stage-fold">พับ</span>
+      <span class="stage-ready">พร้อมรับ</span><span class="stage-collect">รับคืนแล้ว</span>
     </div>
     <div class="toolbar">
       <input id="search" type="search" placeholder="ค้นหาเลขงานหรือลูกค้า" aria-label="ค้นหาเลขงานหรือลูกค้า">
@@ -77,14 +83,28 @@
       collected: 'รับคืนแล้ว',
       cancelled: 'ยกเลิก'
     };
+    const stateStage = {
+      awaiting_dropoff: 'intake', awaiting_quote: 'quote',
+      awaiting_customer_quote_acceptance: 'quote', awaiting_payment: 'payment',
+      payment_review: 'payment', paid: 'wash', washing: 'wash',
+      drying_pending: 'dry', drying: 'dry', folding: 'fold',
+      ready: 'ready', collected: 'collect', cancelled: 'collect'
+    };
+    const actionStage = {
+      dropoff: 'intake', quote: 'quote', 'report-payment-from-chat': 'payment',
+      'verify-payment': 'payment', 'start-wash': 'wash', 'complete-wash': 'wash',
+      'start-dry': 'dry', 'complete-dry': 'dry', ready: 'fold',
+      'notify-ready': 'ready', collect: 'collect'
+    };
     const buckets = [
-      { title: 'ตรวจผ้าและเสนอราคา', states: ['awaiting_dropoff', 'awaiting_quote'] },
-      { title: 'รอลูกค้ายืนยัน', states: ['awaiting_customer_quote_acceptance'] },
-      { title: 'รอชำระเงิน', states: ['awaiting_payment'] },
-      { title: 'ตรวจยอดเงินจริง', states: ['payment_review'] },
-      { title: 'คิวเครื่องซัก–อบ', states: ['paid', 'washing', 'drying_pending', 'drying'] },
-      { title: 'รอพับและตรวจงาน', states: ['folding'] },
-      { title: 'พร้อมรับ / รอลูกค้ามารับ', states: ['ready'] }
+      { title: 'รับผ้าและตรวจผ้า', stage: 'intake', states: ['awaiting_dropoff', 'awaiting_quote'] },
+      { title: 'รอลูกค้ายืนยัน', stage: 'quote', states: ['awaiting_customer_quote_acceptance'] },
+      { title: 'รอชำระเงิน', stage: 'payment', states: ['awaiting_payment'] },
+      { title: 'ตรวจยอดเงินจริง', stage: 'payment', states: ['payment_review'] },
+      { title: 'คิวเครื่องซัก', stage: 'wash', states: ['paid', 'washing'] },
+      { title: 'คิวเครื่องอบ', stage: 'dry', states: ['drying_pending', 'drying'] },
+      { title: 'รอพับและตรวจงาน', stage: 'fold', states: ['folding'] },
+      { title: 'พร้อมรับ / รอลูกค้ามารับ', stage: 'ready', states: ['ready'] }
     ];
     let idToken = '';
     let liveOrders = [];
@@ -207,13 +227,13 @@
       const count = states => all.filter(o => states.includes(o.state)).length;
       const metrics = [
         ['รอตรวจผ้า', count(['awaiting_dropoff','awaiting_quote'])],
-        ['รอลูกค้า / ชำระ', count(['awaiting_customer_quote_acceptance','awaiting_payment'])],
         ['รอตรวจเงิน', all.filter(o => o.paymentState === 'review').length],
         ['คิวเครื่องซัก–อบ', count(['paid','washing','drying_pending','drying'])],
-        ['พร้อมรับ', count(['ready'])]
+        ['พร้อมรับ', count(['ready'])],
+        ['รอลูกค้า / ชำระ', count(['awaiting_customer_quote_acceptance','awaiting_payment'])]
       ];
       document.querySelector('#summary').innerHTML = metrics.map((item, index) =>
-        '<div class="surface metric' + (index === 2 && item[1] ? ' attention' : '') + '"><small>'
+        '<div class="surface metric' + (index === 1 && item[1] ? ' attention' : '') + '"><small>'
         + item[0] + '</small><b>' + item[1] + '</b></div>'
       ).join('');
 
@@ -221,7 +241,7 @@
       document.querySelector('#duePanel').hidden = due.length === 0;
       document.querySelector('#dueList').innerHTML = due.map(o => {
         const remaining = Math.max(0, Math.ceil((Date.parse(o.dueAt) - Date.now()) / 60000));
-        return '<div class="due-item">งาน <b>' + esc(o.orderId) + '</b> · เครื่อง' + (o.state === 'washing' ? 'ซัก' : 'อบ') + 'เลข <b>' + esc(o.machineNo || 'ยังไม่กำหนด')
+        return '<div class="due-item stage-' + (o.state === 'washing' ? 'wash' : 'dry') + '">งาน <b>' + esc(o.orderId) + '</b> · เครื่อง' + (o.state === 'washing' ? 'ซัก' : 'อบ') + 'เลข <b>' + esc(o.machineNo || 'ยังไม่กำหนด')
           + '</b> · ' + (remaining ? 'เหลือประมาณ ' + remaining + ' นาที' : 'ครบเวลาโดยประมาณแล้ว') + ' · กรุณาตรวจเครื่องจริงก่อนกดขั้นตอนถัดไป</div>';
       }).join('');
 
@@ -238,7 +258,7 @@
           const startStage = o.state === 'paid' ? 'wash' : o.state === 'drying_pending' ? 'dry' : '';
           const machinePick = startStage ? machineControl(o, startStage) : '';
           const actionButtons = actionsFor(o).map(([label, slug]) =>
-            '<button class="' + (slug === 'collect' ? 'secondary-button' : 'primary-button')
+            '<button type="button" class="stage-action stage-' + (actionStage[slug] || 'intake')
             + '" data-id="' + esc(o.orderId) + '" data-action="' + slug + '"'
             + (slug === 'start-wash' || slug === 'start-dry' ? ' disabled' : '') + '>' + label + '</button>'
           ).join('');
@@ -250,7 +270,7 @@
               + ' · ยอดรายการนี้ ' + (o.expectedAmountBaht == null ? '—' : money(o.expectedAmountBaht))
               + '<br>ตรวจสลิปในแชต LINE OA และตรวจยอดเงินจริงในบัญชีก่อนยืนยัน</div>'
             : '';
-          return '<article class="job"><div class="job-head"><strong>' + esc(o.orderId)
+          return '<article class="job stage-' + (stateStage[o.state] || 'intake') + '"><div class="job-head"><strong>' + esc(o.orderId)
             + '</strong><b>' + amount + '</b></div>'
             + '<div class="job-name">' + esc(o.displayName || 'ลูกค้า LINE') + '</div>'
             + '<div class="job-meta">ซัก ' + Number(o.washerKg || 0) + ' กก. · อบ ' + Number(o.dryerKg || 0)
@@ -261,7 +281,7 @@
             + review + (dueText ? '<div class="job-note">ครบเวลาโดยประมาณ ' + esc(dueText) + ' · ไม่ใช่เวลารับประกัน</div>' : '')
             + '<div class="job-actions">' + actionButtons + '</div></article>';
         }).join('');
-        return '<section class="surface queue-panel"><h2>' + bucket.title + '<span class="count-bubble">'
+        return '<section class="surface queue-panel stage-' + bucket.stage + '"><h2>' + bucket.title + '<span class="count-bubble">'
           + items.length + '</span></h2><div class="queue-list">' + cards + '</div></section>';
       }).filter(Boolean);
       document.querySelector('#queues').innerHTML = sections.length
@@ -362,7 +382,13 @@
         say('เลือกเลขเครื่องที่ว่างก่อนเริ่มงานครับ', 'error');
         return;
       }
-      button.disabled = true;
+      const actionButtons = [...button.closest('.job').querySelectorAll('button[data-action]')];
+      const previousStates = actionButtons.map(item => item.disabled);
+      const previousLabel = button.textContent;
+      actionButtons.forEach(item => { item.disabled = true; });
+      button.classList.add('is-busy');
+      button.setAttribute('aria-busy', 'true');
+      button.textContent = 'กำลังบันทึก...';
       try { await act(button.dataset.id, button.dataset.action, machineSelect?.value || ''); }
       catch (error) {
         if (button.dataset.action === 'start-wash' || button.dataset.action === 'start-dry') {
@@ -370,7 +396,14 @@
         }
         say(error.message || 'ทำรายการไม่สำเร็จ', 'error');
       }
-      finally { if (button.isConnected) button.disabled = false; }
+      finally {
+        actionButtons.forEach((item, index) => { if (item.isConnected) item.disabled = previousStates[index]; });
+        if (button.isConnected) {
+          button.classList.remove('is-busy');
+          button.removeAttribute('aria-busy');
+          button.textContent = previousLabel;
+        }
+      }
     });
     document.querySelector('#queues').addEventListener('change', event => {
       const select = event.target.closest('select[data-machine-select]');
@@ -383,7 +416,14 @@
         button.textContent = select.value ? step + ' · ' + selectedNumber : step;
       }
     });
-    document.querySelector('#refresh').addEventListener('click', () => refresh().catch(error => say(error.message, 'error')));
+    document.querySelector('#refresh').addEventListener('click', async event => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      button.textContent = 'กำลังโหลด...';
+      try { await refresh(); }
+      catch (error) { say(error.message, 'error'); }
+      finally { button.disabled = false; button.textContent = 'รีเฟรช'; }
+    });
     document.querySelector('#search').addEventListener('input', render);
     document.querySelector('#filter').addEventListener('change', render);
     async function start() {
