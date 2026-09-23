@@ -1,0 +1,14 @@
+node_modules/
+.env
+.env.*
+!.env.example
+.dev.vars
+.clasp.json
+gas/.clasp.json
+.wrangler/
+dist/
+coverage/
+*.log
+*.secret
+*.pem
+*.key

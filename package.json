@@ -1,0 +1,12 @@
+{
+  "name": "niti1hour-wash-dry-fold",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "ระบบรับฝากซัก-อบ-พับ แยกจากระบบรีดผ้าเดิมของนิติ รีดเรียบ",
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check worker/index.js && node --check packages/shared/business.js && node --check worker/index.test.js && node --test"
+  },
+  "engines": { "node": ">=20" }
+}
