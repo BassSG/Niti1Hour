@@ -102,6 +102,21 @@ function config_() {
   var p=PropertiesService.getScriptProperties();
   return {sheetId:p.getProperty('VALET_SHEET_ID')||'',sharedSecret:p.getProperty('VALET_SHARED_SECRET')||'',adminLineIds:(p.getProperty('VALET_ADMIN_LINE_IDS')||'').split(',').map(function(x){return x.trim();}).filter(Boolean)};
 }
+
+// Run manually from the editor before deployment. Never logs credentials.
+function auditValetBackendReadiness() {
+  var cfg=config_(), result={sheetConfigured:!!cfg.sheetId,sharedSecretConfigured:!!cfg.sharedSecret,adminCount:cfg.adminLineIds.length,sheetReadable:false};
+  if(cfg.sheetId){
+    try{
+      var ss=SpreadsheetApp.openById(cfg.sheetId);
+      var orders=ss.getSheetByName('Orders');
+      result.sheetReadable=!!orders;
+      result.orderCount=orders?Math.max(0,orders.getLastRow()-1):0;
+    }catch(error){ result.sheetError=String(error&&error.message||error).slice(0,100); }
+  }
+  console.log('VALET_BACKEND_READINESS '+JSON.stringify(result));
+  return result;
+}
 function authorize_(action,actor,cfg) {
   if(action==='catalog') return;
   if(!actor) throw apiError_('AUTH_REQUIRED','กรุณายืนยันตัวตนก่อน',401);

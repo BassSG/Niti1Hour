@@ -54,6 +54,7 @@
       <input id="search" type="search" placeholder="ค้นหาเลขงานหรือลูกค้า" aria-label="ค้นหาเลขงานหรือลูกค้า">
       <select id="filter" aria-label="กรองตามสถานะ"><option value="all">ทุกสถานะ</option></select>
       <button id="refresh" class="secondary-button" type="button">รีเฟรช</button>
+      <button id="clearDemo" class="secondary-button" type="button" hidden>ล้างงานทดลอง</button>
     </div>
     <p id="status" class="status" role="status" aria-live="polite"></p>
     <section id="queues" class="queue-grid" aria-label="คิวงานแยกตามขั้นตอน"></section>
@@ -114,16 +115,13 @@
       statusNode.textContent = value;
       statusNode.className = 'status' + (tone ? ' ' + tone : '');
     }
-    function seed() {
-      return [
-        { orderId:'DEMO-01', displayName:'ลูกค้าทดสอบ A', state:'awaiting_dropoff', washerKg:9, dryerKg:14, estimateBaht:110, supplyMode:'customer_own', paymentState:'unpaid' },
-        { orderId:'DEMO-02', displayName:'ลูกค้าทดสอบ B', state:'payment_review', washerKg:14, dryerKg:21, estimateBaht:150, expectedAmountBaht:150, reportedAmountBaht:150, supplyMode:'customer_own', paymentState:'review' },
-        { orderId:'DEMO-03', displayName:'ลูกค้าทดสอบ C', state:'washing', washerKg:18, dryerKg:21, estimateBaht:170, supplyMode:'customer_own', paymentState:'verified', machineId:'W-5', machineNo:'5', dueAt:new Date(Date.now()-60000).toISOString() },
-        { orderId:'DEMO-04', displayName:'ลูกค้าทดสอบ D', state:'folding', washerKg:27, dryerKg:25, estimateBaht:220, supplyMode:'customer_own', paymentState:'verified' }
-      ];
-    }
     function demoOrders() {
       try {
+        const cleanupKey = storeKey + ':clean-start-v2';
+        if (localStorage.getItem(cleanupKey) !== 'done') {
+          localStorage.removeItem(storeKey);
+          localStorage.setItem(cleanupKey, 'done');
+        }
         const saved = JSON.parse(localStorage.getItem(storeKey) || 'null');
         if (Array.isArray(saved)) {
           const legacyIds = {
@@ -145,7 +143,7 @@
           return migrated;
         }
       } catch {}
-      const initial = seed();
+      const initial = [];
       localStorage.setItem(storeKey, JSON.stringify(initial));
       return initial;
     }
@@ -224,6 +222,8 @@
     }
     function render() {
       const all = currentOrders();
+      const clearDemoButton = document.querySelector('#clearDemo');
+      clearDemoButton.hidden = !isDemo || all.length === 0;
       const count = states => all.filter(o => states.includes(o.state)).length;
       const metrics = [
         ['รอตรวจผ้า', count(['awaiting_dropoff','awaiting_quote'])],
@@ -423,6 +423,14 @@
       try { await refresh(); }
       catch (error) { say(error.message, 'error'); }
       finally { button.disabled = false; button.textContent = 'รีเฟรช'; }
+    });
+    document.querySelector('#clearDemo').addEventListener('click', () => {
+      if (!isDemo) return;
+      const count = demoOrders().length;
+      if (!count || !confirm('ล้างรายการทดลองทั้งหมดในอุปกรณ์นี้ ' + count + ' รายการ? ไม่มีผลต่อชีตหรือ LINE OA')) return;
+      localStorage.setItem(storeKey, '[]');
+      say('ล้างรายการทดลองแล้ว · ไม่มีข้อมูลจริงถูกลบ', 'ok');
+      render();
     });
     document.querySelector('#search').addEventListener('input', render);
     document.querySelector('#filter').addEventListener('change', render);

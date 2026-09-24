@@ -129,7 +129,14 @@
       status.className = 'status' + (tone ? ' ' + tone : '');
     }
     function demoOrders() {
-      try { const saved = JSON.parse(localStorage.getItem(storeKey) || '[]'); return Array.isArray(saved) ? saved : []; }
+      try {
+        const cleanupKey = storeKey + ':clean-start-v2';
+        if (localStorage.getItem(cleanupKey) !== 'done') {
+          localStorage.removeItem(storeKey);
+          localStorage.setItem(cleanupKey, 'done');
+        }
+        const saved = JSON.parse(localStorage.getItem(storeKey) || '[]'); return Array.isArray(saved) ? saved : [];
+      }
       catch { return []; }
     }
     async function paymentImage(payload, orderId, amount, demo) {
